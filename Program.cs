@@ -28,16 +28,8 @@ builder.Services.AddSingleton<UpdateUsersService>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    Console.WriteLine("Running in development environment.");
-    app.MapOpenApi();
-    app.MapScalarApiReference();
-}
-else
-{
-    Console.WriteLine("Running in release environment.");
-}
+app.MapOpenApi();
+app.MapScalarApiReference();
 
 app.UseHttpsRedirection();
 

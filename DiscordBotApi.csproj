@@ -4,6 +4,9 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+	<ContainerRegistry>docker.io</ContainerRegistry>
+	<ContainerRepository>redfrozzi/discordbotapi</ContainerRepository>
+	<ContainerImageTags>v0.0.1;latest</ContainerImageTags>
   </PropertyGroup>
 
   <ItemGroup>
