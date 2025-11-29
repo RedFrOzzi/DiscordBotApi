@@ -1,6 +1,6 @@
 ﻿using DiscordBotApi.Data.Messages;
-using DiscordBotApi.DiscordBot;
 using Microsoft.AspNetCore.Mvc;
+using NetCord.Gateway;
 using NetCord.Rest;
 
 namespace DiscordBotApi.Controllers
@@ -9,11 +9,11 @@ namespace DiscordBotApi.Controllers
     [Route("/BotMessages")]
     public class BotMessagesController : ControllerBase
     {
-        readonly DiscordBotBackgroundService _botService;
+        readonly GatewayClient _client;
 
-        public BotMessagesController(DiscordBotBackgroundService botService)
+        public BotMessagesController([FromKeyedServices("client")] GatewayClient client)
         {
-            _botService = botService;
+            _client = client;
         }
 
         //------------------------------------------------------SEND-MESSAGES-------------------------------------------------------------------------------------------------------------
@@ -22,12 +22,12 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(200)]
         public async Task<IActionResult> SendMessage([FromQuery] ulong channelId, [FromBody] MessageProperties messageProps, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
 
-            await _botService.Client.SendMessageAsync(channelId, messageProps, cancellationToken: cancellationToken);
+            await _client.Rest.SendMessageAsync(channelId, messageProps, cancellationToken: cancellationToken);
 
             return Ok();
         }
@@ -36,12 +36,12 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(200)]
         public async Task<IActionResult> SendMessage([FromQuery] ulong channelId, [FromBody] string message, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
 
-            await _botService.Client.SendMessageAsync(channelId, message, cancellationToken: cancellationToken);
+            await _client.Rest.SendMessageAsync(channelId, message, cancellationToken: cancellationToken);
 
             return Ok();
         }
@@ -50,12 +50,12 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(200)]
         public async Task<IActionResult> SendMessageWithEmbed([FromQuery] ulong channelId, [FromBody] SendEmbedDto embed, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
 
-            await _botService.Client.SendMessageAsync(channelId, new MessageProperties().AddEmbeds(embed.Convert()), cancellationToken: cancellationToken);
+            await _client.Rest.SendMessageAsync(channelId, new MessageProperties().AddEmbeds(embed.Convert()), cancellationToken: cancellationToken);
 
             return Ok();
         }
@@ -66,12 +66,12 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(200)]
         public async Task<IActionResult> DeleteBotMessages([FromQuery] ulong channelId, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
 
-            await _botService.Client.DeleteMessagesAsync(channelId, GetMessages(_botService.Client, channelId), cancellationToken: cancellationToken);
+            await _client.Rest.DeleteMessagesAsync(channelId, GetMessages(_client.Rest, channelId), cancellationToken: cancellationToken);
 
             return Ok();
 
@@ -90,12 +90,12 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(200)]
         public async Task<IActionResult> DeleteMessage([FromQuery] ulong channelId, [FromQuery] ulong massageId, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
 
-            await _botService.Client.DeleteMessageAsync(channelId, massageId, cancellationToken: cancellationToken);
+            await _client.Rest.DeleteMessageAsync(channelId, massageId, cancellationToken: cancellationToken);
 
             return Ok();
         }
@@ -104,12 +104,12 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(200)]
         public async Task<IActionResult> DeleteMessages([FromQuery] ulong channelId, [FromQuery] ulong userId, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
 
-            await _botService.Client.DeleteMessagesAsync(channelId, GetMessages(_botService.Client, channelId, userId), cancellationToken: cancellationToken);
+            await _client.Rest.DeleteMessagesAsync(channelId, GetMessages(_client.Rest, channelId, userId), cancellationToken: cancellationToken);
 
             return Ok();
 

@@ -1,8 +1,6 @@
-﻿using DiscordBotApi.Data.Channels;
-using DiscordBotApi.Database;
-using DiscordBotApi.DiscordBot;
+﻿using DiscordBotApi.Database;
 using Microsoft.AspNetCore.Mvc;
-using NetCord.Rest;
+using NetCord.Gateway;
 
 namespace DiscordBotApi.Controllers
 {
@@ -11,12 +9,12 @@ namespace DiscordBotApi.Controllers
     public class DiscordChannelsController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        private readonly DiscordBotBackgroundService _botService;
+        private readonly GatewayClient _client;
 
-        public DiscordChannelsController(ApplicationDbContext context, DiscordBotBackgroundService botService)
+        public DiscordChannelsController(ApplicationDbContext context, [FromKeyedServices("client")] GatewayClient client)
         {
             _context = context;
-            _botService = botService;
+            _client = client;
         }
 
         [HttpGet("/channel/get-channels")]
@@ -38,12 +36,12 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(500)]
         public async Task<IActionResult> SaveDataToDatabase([FromQuery] ulong guildId, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
 
-            var guild = await _botService.Client.GetGuildAsync(guildId, cancellationToken: cancellationToken);
+            var guild = await _client.Rest.GetGuildAsync(guildId, cancellationToken: cancellationToken);
             var cahnnels = await guild.GetChannelsAsync(cancellationToken: cancellationToken);
             var dicordGuild = await _context.GetGuild(guildId, cancellationToken);
 
@@ -65,12 +63,12 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(500)]
         public async Task<IActionResult> UpdateDataToDatabase([FromQuery] ulong guildId, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
 
-            var guild = await _botService.Client.GetGuildAsync(guildId, cancellationToken: cancellationToken);
+            var guild = await _client.Rest.GetGuildAsync(guildId, cancellationToken: cancellationToken);
             var cahnnels = await guild.GetChannelsAsync(cancellationToken: cancellationToken);
             var dicordGuild = await _context.GetGuild(guildId, cancellationToken);
 

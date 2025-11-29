@@ -1,9 +1,8 @@
 ﻿using DiscordBotApi.Data.Users;
 using DiscordBotApi.Database;
-using DiscordBotApi.DiscordBot;
 using Microsoft.AspNetCore.Mvc;
 using NetCord;
-using NetCord.Rest;
+using NetCord.Gateway;
 
 namespace DiscordBotApi.Controllers
 {
@@ -12,12 +11,12 @@ namespace DiscordBotApi.Controllers
     public class DiscordGuildsController :ControllerBase
     {
         private readonly ApplicationDbContext _context;
-        private readonly DiscordBotBackgroundService _botService;
+        private readonly GatewayClient _client;
 
-        public DiscordGuildsController(ApplicationDbContext context, DiscordBotBackgroundService botService)
+        public DiscordGuildsController(ApplicationDbContext context, [FromKeyedServices("client")] GatewayClient client)
         {
             _context = context;
-            _botService = botService;
+            _client = client;
         }
 
         [HttpPut("/guild/save-data")]
@@ -25,15 +24,15 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(500)]
         public async Task<IActionResult> SaveDataToDatabase([FromQuery] ulong guildId, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
 
             List<DiscordUser> allUsers = await _context.GetUsers(cancellationToken);
             List<GuildUser> guildUsers = [];
-            var guild = await _botService.Client.GetGuildAsync(guildId, cancellationToken: cancellationToken);
-            await foreach (var u in _botService.Client.GetGuildUsersAsync(guildId))
+            var guild = await _client.Rest.GetGuildAsync(guildId, cancellationToken: cancellationToken);
+            await foreach (var u in _client.Rest.GetGuildUsersAsync(guildId))
             {
                 guildUsers.Add(u);
             }
@@ -51,7 +50,7 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(500)]
         public async Task<IActionResult> UpdateDataToDatabase([FromQuery] ulong guildId, CancellationToken cancellationToken)
         {
-            if (_botService?.Client == null)
+            if (_client == null)
             {
                 return BadRequest("Bot service is not working");
             }
@@ -61,7 +60,7 @@ namespace DiscordBotApi.Controllers
             {
                 return NotFound();
             }
-            var channels = await _botService.Client.GetGuildChannelsAsync(guildId, cancellationToken: cancellationToken);
+            var channels = await _client.Rest.GetGuildChannelsAsync(guildId, cancellationToken: cancellationToken);
             var allDbChannels = await _context.GetChannelsAsync(guildId, cancellationToken: cancellationToken);
 
             if (await _context.UpdateGuildData(guildFromDb, allDbChannels, channels, cancellationToken))

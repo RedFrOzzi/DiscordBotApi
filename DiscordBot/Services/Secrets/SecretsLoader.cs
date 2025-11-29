@@ -4,7 +4,9 @@
     {
         public static Secrets GetSecrets()
         {
-            var path = AppDomain.CurrentDomain.BaseDirectory + "secrets.json";
+            var path = AppDomain.CurrentDomain.BaseDirectory + "Secrets/" + "secrets.json";
+            Console.WriteLine("Domain path is: " + path);
+
             if (File.Exists(path))
             {
                 var scrts = System.Text.Json.JsonSerializer.Deserialize<Secrets>(File.ReadAllText(path));

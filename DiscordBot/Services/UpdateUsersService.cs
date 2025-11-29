@@ -2,7 +2,7 @@
 using DiscordBotApi.Utilities;
 using Microsoft.EntityFrameworkCore;
 using NetCord;
-using NetCord.Rest;
+using NetCord.Gateway;
 
 namespace DiscordBotApi.DiscordBot.Services
 {
@@ -30,11 +30,11 @@ namespace DiscordBotApi.DiscordBot.Services
         {
             Console.WriteLine("Started background update job");
 
-            Task.Factory.StartNew(() => 
+            Task.Factory.StartNew(() =>
             {
                 using var scope = _serviceFactory.CreateScope();
-                var botService = scope.ServiceProvider.GetRequiredService<DiscordBotBackgroundService>();
-                if (botService == null || botService.Client == null)
+                var client = scope.ServiceProvider.GetKeyedService<GatewayClient>("client");
+                if (client == null)
                 {
                     Console.WriteLine("Bot service is not working");
                     return;
@@ -49,20 +49,20 @@ namespace DiscordBotApi.DiscordBot.Services
                 _isInUpdateState = true;
                 _isCancelled = false;
 
-                var guild = botService.Client.GetGuildAsync(guildId).GetAwaiter().GetResult();
+                var guild = client.Rest.GetGuildAsync(guildId).GetAwaiter().GetResult();
                 if (guild == null)
                 {
                     _isInUpdateState = false;
                     return;
                 }
-                var guildUsers = botService.Client.GetGuildUsersAsync(guild.Id).ToListAsync().GetAwaiter().GetResult();
+                var guildUsers = client.Rest.GetGuildUsersAsync(guild.Id).ToListAsync().GetAwaiter().GetResult();
                 if (guildUsers == null || guildUsers.Count == 0)
                 {
                     _isInUpdateState = false;
                     return;
                 }
                 int usersCount = guildUsers.Count;
-                
+
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 if (context == null)
                 {
@@ -82,7 +82,7 @@ namespace DiscordBotApi.DiscordBot.Services
                     var rolesFromDiscord = user.GetRoles(guild).ToArray();
                     var dbUser = context.Users.FirstOrDefault(u => u.Id == user.Id);
 
-                    if (dbUser == null) 
+                    if (dbUser == null)
                     {
                         usersCount--;
                         Console.WriteLine($"Users to update left: {usersCount}");
