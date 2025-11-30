@@ -9,12 +9,18 @@ namespace DiscordBotApi.Database
     {
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) { }
 
+        public DbSet<ApiUser> ApiUsers { get; set; }
         public DbSet<DiscordGuild> Guilds { get; set; }
         public DbSet<DiscordChannel> Channels { get; set; }
         public DbSet<DiscordUser> Users { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<ApiUser>(entity =>
+            {
+                entity.HasAlternateKey(u => u.ApiUserId);
+            });
+
             modelBuilder.Entity<DiscordUser>(entity =>
             {
                 entity.HasAlternateKey(u => u.Id);

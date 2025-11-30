@@ -10,6 +10,25 @@ namespace DiscordBotApi.Database
 {
     public static class ApplicationDbContextExtensions
     {
+        //API USER
+        public static bool CreateApiUser(this ApplicationDbContext ctx, string login, string passwordHash)
+        {
+            var user = new ApiUser
+            {
+                Login = login,
+                PasswordHash = passwordHash
+            };
+
+            ctx.ApiUsers.Add(user);
+            return ctx.SaveChanges() > 0;
+        }
+
+        public static ApiUser? GetApiUser(this ApplicationDbContext ctx, string login)
+        {
+            return ctx.ApiUsers.FirstOrDefault(x => x.Login == login);
+        }
+
+        //DISCORD USER
         public static DiscordUser? GetUser(this ApplicationDbContext ctx, ulong id)
         {
             return ctx.Users.FirstOrDefault(ctx => ctx.Id == id);

@@ -4,5 +4,6 @@
     public class SecretsJson
     {
         public string? Token { get; set; }
+        public string? Salt { get; set; }
     }
 }

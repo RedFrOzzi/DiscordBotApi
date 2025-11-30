@@ -43,17 +43,5 @@ namespace DiscordBotApi.Data.Users
                 ImageURL = null,
             };
         }
-
-        public static DiscordUser ConvertToDiscordUser(this User user)
-        {
-            return new()
-            {
-                Id = user.Id,
-                Username = user.Username,
-                Nickname = null,
-                GlobalName = user.GlobalName,
-                ImageURL = null,
-            };
-        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using DiscordBotApi.Data.Users;
 using DiscordBotApi.Database;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NetCord;
 using NetCord.Gateway;
@@ -8,6 +9,7 @@ namespace DiscordBotApi.Controllers
 {
     [ApiController]
     [Route("[controller]")]
+    [Authorize(Roles = "Admin")]
     public class DiscordGuildsController :ControllerBase
     {
         private readonly ApplicationDbContext _context;

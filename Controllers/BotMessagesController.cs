@@ -1,4 +1,5 @@
 ﻿using DiscordBotApi.Data.Messages;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NetCord.Gateway;
 using NetCord.Rest;
@@ -7,6 +8,7 @@ namespace DiscordBotApi.Controllers
 {
     [ApiController]
     [Route("/BotMessages")]
+    [Authorize(Roles = "Admin")]
     public class BotMessagesController : ControllerBase
     {
         readonly GatewayClient _client;
