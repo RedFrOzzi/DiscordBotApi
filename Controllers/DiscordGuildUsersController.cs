@@ -143,7 +143,7 @@ namespace DiscordBotApi.Controllers
                 users.Add(user);
             }
 
-            if (_context.SaveUsersData(users))
+            if (_context.SaveNewUsersData(users))
             {
                 return Created();
             }

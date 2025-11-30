@@ -5,6 +5,7 @@
 
 Migrations/
 ApplicationData.db
+bot_logs.log
 
 # User-specific files
 *.rsuser

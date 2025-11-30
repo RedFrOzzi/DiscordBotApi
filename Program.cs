@@ -1,6 +1,7 @@
 using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot;
 using DiscordBotApi.DiscordBot.Services;
+using DiscordBotApi.Middleweres;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
@@ -62,5 +63,7 @@ app.UseCors();
 app.UseAuthorization();
 
 app.MapControllers();
+
+app.UseMiddleware<TempAuthentificationMiddlewere>();
 
 app.Run();

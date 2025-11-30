@@ -43,14 +43,14 @@ namespace DiscordBotApi.Controllers
 
             var guild = await _client.Rest.GetGuildAsync(guildId, cancellationToken: cancellationToken);
             var cahnnels = await guild.GetChannelsAsync(cancellationToken: cancellationToken);
-            var dicordGuild = await _context.GetGuild(guildId, cancellationToken);
+            var discordGuild = await _context.GetGuild(guildId, cancellationToken);
 
-            if (dicordGuild == null)
+            if (discordGuild == null)
             {
                 return NotFound();
             }
 
-            if (_context.SaveChannelsData(dicordGuild, cahnnels))
+            if (_context.SaveNewChannelsData(discordGuild, cahnnels))
             {
                 return Created();
             }

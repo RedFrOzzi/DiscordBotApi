@@ -29,6 +29,11 @@ namespace DiscordBotApi.Controllers
                 return BadRequest("Bot service is not working");
             }
 
+            if (_context.IsGuildExistInDb(guildId, out _))
+            {
+                return BadRequest("Guild already exist in the database");
+            }
+
             List<DiscordUser> allUsers = await _context.GetUsers(cancellationToken);
             List<GuildUser> guildUsers = [];
             var guild = await _client.Rest.GetGuildAsync(guildId, cancellationToken: cancellationToken);
@@ -55,15 +60,15 @@ namespace DiscordBotApi.Controllers
                 return BadRequest("Bot service is not working");
             }
 
-            var guildFromDb = await _context.GetGuild(guildId, cancellationToken: cancellationToken);
-            if (guildFromDb == null)
+            if (!_context.IsGuildExistInDb(guildId, out var guildFromDb))
             {
                 return NotFound();
             }
+
             var channels = await _client.Rest.GetGuildChannelsAsync(guildId, cancellationToken: cancellationToken);
             var allDbChannels = await _context.GetChannelsAsync(guildId, cancellationToken: cancellationToken);
 
-            if (await _context.UpdateGuildData(guildFromDb, allDbChannels, channels, cancellationToken))
+            if (await _context.UpdateGuildData(guildFromDb!, allDbChannels, channels, cancellationToken))
             {
                 return Created();
             }

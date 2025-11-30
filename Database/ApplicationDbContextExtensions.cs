@@ -33,11 +33,15 @@ namespace DiscordBotApi.Database
             return changes > 0;
         }
 
-        public static bool SaveUsersData(this ApplicationDbContext ctx, List<GuildUser> users)
+        public static bool SaveNewUsersData(this ApplicationDbContext ctx, List<GuildUser> users)
         {
-            for (int i = 0; i < users.Count; i++)
+            var oldUsersIds = ctx.Users.Select(u => u.Id).ToArray();
+
+            var newUsers = users.Where(u => !oldUsersIds.Contains(u.Id)).ToArray();
+
+            for (int i = 0; i < newUsers.Length; i++)
             {
-                var dUser = users[i].ConvertToDiscordUser();
+                var dUser = newUsers[i].ConvertToDiscordUser();
                 ctx.Users.Add(dUser);
             }
 
@@ -59,6 +63,18 @@ namespace DiscordBotApi.Database
 
             var changes = ctx.SaveChanges();
             return changes > 0;
+        }
+
+        //GUILD
+        public static bool IsGuildExistInDb(this ApplicationDbContext ctx, ulong guildId, out DiscordGuild? guild)
+        {
+            guild = ctx.Guilds.FirstOrDefault(g => g.Id == guildId);
+            if (guild == null)
+            {
+                return false;
+            }
+
+            return true;
         }
 
         public static bool SaveGuildData(this ApplicationDbContext ctx,
@@ -136,6 +152,8 @@ namespace DiscordBotApi.Database
             return changes > 0;
         }
 
+        //CHANNELS
+
         public static async Task<List<DiscordChannel>> GetChannelsAsync(this ApplicationDbContext ctx, ulong guildId, CancellationToken cancellationToken)
         {
             return await ctx.Channels.Where(c => c.Guild.Id == guildId).ToListAsync(cancellationToken);
@@ -153,7 +171,7 @@ namespace DiscordBotApi.Database
                 .ToListAsync(cancellationToken);
         }
 
-        public static bool SaveChannelsData(this ApplicationDbContext ctx, DiscordGuild guild, IReadOnlyList<IGuildChannel> channels)
+        public static bool SaveNewChannelsData(this ApplicationDbContext ctx, DiscordGuild guild, IReadOnlyList<IGuildChannel> channels)
         {
             for (int i = 0; i < channels.Count; i++)
             {
