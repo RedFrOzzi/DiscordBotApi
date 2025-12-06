@@ -1,30 +1,27 @@
-﻿namespace DiscordBotApi.DiscordBot.Services.Secrets
+﻿using System.Text.Json;
+
+namespace DiscordBotApi.DiscordBot.Services.Secrets
 {
     public static class SecretsLoader
     {
-        public static Secrets GetSecrets()
+        public static bool TryGetSecrets(out SecretsJson secrets)
         {
-            var path = AppDomain.CurrentDomain.BaseDirectory + "Secrets/" + "secrets.json";
-            Console.WriteLine("Domain path is: " + path);
-
-            if (File.Exists(path))
+            if (!File.Exists(AppDomain.CurrentDomain.BaseDirectory + "/secrets.txt"))
             {
-                var scrts = System.Text.Json.JsonSerializer.Deserialize<Secrets>(File.ReadAllText(path));
-                if (scrts == null || string.IsNullOrEmpty(scrts.Token))
+                secrets = new SecretsJson();
+                return false;
+            }
+            else
+            {
+                secrets = JsonSerializer.Deserialize<SecretsJson>(File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "/secrets.txt"))!;
+                if (secrets == null)
                 {
-                    throw new Exception("Secrets are empty");
+                    secrets = new SecretsJson();
+                    return false;
                 }
 
-                return scrts;
+                return true;
             }
-
-            throw new Exception("Secrets file does not exist");
-        }
-
-        public class Secrets
-        {
-            public string Token { get; set; } = string.Empty;
-            public List<ulong> AdminIds { get; set; } = [];
         }
     }
 }

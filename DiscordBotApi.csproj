@@ -30,7 +30,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="DiscordBot\Services\CommandModules\" />
     <Folder Include="Middleweres\" />
   </ItemGroup>
 

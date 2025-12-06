@@ -1,5 +1,6 @@
 ﻿using DiscordBotApi.Data.Channels;
 using DiscordBotApi.Data.Guilds;
+using DiscordBotApi.Data.Raffles;
 using DiscordBotApi.Data.Users;
 using Microsoft.EntityFrameworkCore;
 using NetCord;
@@ -39,6 +40,7 @@ namespace DiscordBotApi.Database
             return await ctx.Users.ToListAsync(cancellationToken);
         }
 
+        //GUILDS
         public static async Task<DiscordGuild?> GetGuild(this ApplicationDbContext ctx, ulong id, CancellationToken cancellationToken)
         {
             return await ctx.Guilds.FirstOrDefaultAsync(g => g.Id == id, cancellationToken: cancellationToken);
@@ -68,20 +70,25 @@ namespace DiscordBotApi.Database
             return changes > 0;
         }
 
-        public static bool UpdateUsers(this ApplicationDbContext ctx, List<GuildUser> users)
+        public static bool TryUpdateUsers(this ApplicationDbContext ctx, List<GuildUser> users)
         {
-            for (int i = 0; i < users.Count; i++)
+            try
             {
-                var discordUser = ctx.Users.FirstOrDefault(u => u.Id == users[i].Id);
-                if (discordUser == null) { continue; }
-                discordUser.Nickname = users[i].Nickname;
-                discordUser.GlobalName = users[i].GlobalName;
+                for (int i = 0; i < users.Count; i++)
+                {
+                    var discordUser = ctx.Users.FirstOrDefault(u => u.Id == users[i].Id);
+                    if (discordUser == null) { continue; }
+                    discordUser.Nickname = users[i].Nickname;
+                    discordUser.GlobalName = users[i].GlobalName;
+                }
 
-                ctx.Users.Update(discordUser);
+                var changes = ctx.SaveChanges();
+                return changes > 0;
             }
-
-            var changes = ctx.SaveChanges();
-            return changes > 0;
+            catch
+            {
+                return false;
+            }
         }
 
         //GUILD
@@ -234,6 +241,88 @@ namespace DiscordBotApi.Database
             return changes > 0;
         }
 
+        //RAFFLE
+        public static bool TryCreateNewRaffle(this ApplicationDbContext ctx, Raffle raffle, out int insertedRaffleId)
+        {
+            ctx.Rafles.Add(raffle);
+            bool isInserted = ctx.SaveChanges() > 0;
+            insertedRaffleId = raffle.Id;
+            return isInserted;
+        }
+
+        public static bool TryUpdateRaffle(this ApplicationDbContext ctx, int raffleId, Raffle newValuesRaffle)
+        {
+            var foundRaffle = ctx.Rafles.FirstOrDefault(r => r.Id == raffleId);
+            if (foundRaffle == null)
+            {
+                return false;
+            }
+
+            foundRaffle.Question = newValuesRaffle.Question;
+            foundRaffle.Answer_1 = newValuesRaffle.Answer_1;
+            foundRaffle.Answer_2 = newValuesRaffle.Answer_2;
+            foundRaffle.Answer_3 = newValuesRaffle.Answer_3;
+            foundRaffle.Answer_4 = newValuesRaffle.Answer_4;
+            foundRaffle.AnswerButtonsMessageId = newValuesRaffle.AnswerButtonsMessageId;
+            foundRaffle.IsClosed = newValuesRaffle.IsClosed;
+            foundRaffle.CreatedAt = newValuesRaffle.CreatedAt;
+
+            return ctx.SaveChanges() > 0;
+        }
+
+        public static Raffle? GetRaffle(this ApplicationDbContext ctx, int raffleId)
+        {
+            return ctx.Rafles.FirstOrDefault(r => r.Id == raffleId);
+        }
+
+        public static UserBet[] GetUsersBets(this ApplicationDbContext ctx, Raffle raffle)
+        {
+            return ctx.UserBets.Where(ub => ub.Raffle.Id == raffle.Id).Select(ub => new UserBet
+            {
+                Id = ub.Id,
+                User = ub.User,
+                AnswerNumber = ub.AnswerNumber,
+                BetAmount = ub.BetAmount,
+                Raffle = ub.Raffle
+            }).ToArray();
+        }
+
+        public static UserBet[] GetUsersBetsByAnswerNum(this ApplicationDbContext ctx, Raffle raffle, int answerNum)
+        {
+            return ctx.UserBets.Where(ub => ub.Raffle.Id == raffle.Id && ub.AnswerNumber == answerNum).Select(ub => new UserBet
+            {
+                Id = ub.Id,
+                User = ub.User,
+                AnswerNumber = ub.AnswerNumber,
+                BetAmount = ub.BetAmount,
+                Raffle = ub.Raffle
+            }).ToArray();
+        }
+
+        public static DiscordUser[] GetUsersWithBets(this ApplicationDbContext ctx, int raffleId)
+        {
+            return ctx.UserBets.Where(ub => ub.Raffle.Id == raffleId).Select(ub => ub.User).ToArray();
+        }
+
+        public static bool TryAddUserBet(this ApplicationDbContext ctx, UserBet bet)
+        {
+            ctx.UserBets.Add(bet);
+            return ctx.SaveChanges() > 0;
+        }
+
+        public static void ChangeUserIqPoints(this ApplicationDbContext ctx, int userKey, int iqPoints)
+        {
+            var user = ctx.Users.Find(userKey);
+            if (user == null)
+            {
+                return;
+            }
+
+            user.UserIQ += iqPoints;
+            ctx.SaveChanges();
+        }
+
+        //---------------------------------------------------------------------------------------------------------------------------------------------------------------
 
         private static bool ContainsUser(ulong id, List<DiscordUser> allDbUsers, out DiscordUser discordUser)
         {

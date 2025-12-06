@@ -1,5 +1,6 @@
 ﻿using NetCord;
 using NetCord.Rest;
+using static NetCord.Mentionable;
 
 namespace DiscordBotApi.Data.Users
 {
@@ -16,8 +17,22 @@ namespace DiscordBotApi.Data.Users
                     Nickname = user.Nickname,
                     GlobalName = user.GlobalName,
                     ImageURL = user.ImageURL,
+                    UserIQ = user.UserIQ,
                 };
             }
+        }
+
+        public static DiscordUserGetDto ConverToDto(this DiscordUser user)
+        {
+            return new()
+            {
+                Id = user.Id.ToString(),
+                GlobalName = user.GlobalName,
+                Username = user.Username,
+                Nickname = user.Nickname,
+                ImageURL= user.ImageURL,
+                UserIQ = user.UserIQ,
+            };
         }
 
         public static DiscordUserGetDto ConvertToDiscordUser(this GuildUser user, RestGuild guild)

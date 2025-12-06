@@ -12,5 +12,6 @@ namespace DiscordBotApi.Data.Users
         public string? Nickname { get; set; } = string.Empty;
         public string? GlobalName { get; set; } = string.Empty;
         public string? ImageURL { get; set; } = string.Empty;
+        public int UserIQ { get; set; }
     }
 }

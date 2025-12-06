@@ -5,5 +5,7 @@
     {
         public string? Token { get; set; }
         public string? Salt { get; set; }
+
+        public ulong[] AdminIds { get; set; } = [];
     }
 }

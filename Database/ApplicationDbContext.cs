@@ -1,5 +1,6 @@
 ﻿using DiscordBotApi.Data.Channels;
 using DiscordBotApi.Data.Guilds;
+using DiscordBotApi.Data.Raffles;
 using DiscordBotApi.Data.Users;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,10 @@ namespace DiscordBotApi.Database
         public DbSet<DiscordGuild> Guilds { get; set; }
         public DbSet<DiscordChannel> Channels { get; set; }
         public DbSet<DiscordUser> Users { get; set; }
+
+        //Raffle
+        public DbSet<Raffle> Rafles { get; set; }
+        public DbSet<UserBet> UserBets { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

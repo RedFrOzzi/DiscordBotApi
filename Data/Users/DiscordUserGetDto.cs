@@ -10,6 +10,7 @@ namespace DiscordBotApi.Data.Users
         public string? GlobalName { get; set; } = string.Empty;
         public string? ImageURL { get; set; } = string.Empty;
         public VoiceStateDto? VoiceState { get; set; }
+        public int UserIQ { get; set; }
 
         public void AddVoiceState(NetCord.Gateway.VoiceState voiceState)
         {

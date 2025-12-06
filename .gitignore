@@ -5,7 +5,10 @@
 
 Migrations/
 ApplicationData.db
+ApplicationData.db-shm
+ApplicationData.db-wal
 bot_logs.log
+secrets.json
 
 # User-specific files
 *.rsuser

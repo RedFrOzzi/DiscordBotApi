@@ -153,6 +153,30 @@ namespace DiscordBotApi.Controllers
             return Problem(statusCode: 500, title: "Not saved", detail: "Database error");
         }
 
+        [HttpPatch("/user/change-iq")]
+        [ProducesResponseType(200)]
+        [ProducesResponseType(500)]
+        public IActionResult GiveUserIqPoints([FromBody] ulong userId, [FromBody] int iqPointsChange, CancellationToken cancellationToken)
+        {
+            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
+            if (user == null)
+            {
+                return NotFound();
+            }
+
+            user.UserIQ += iqPointsChange;
+            if (_context.SaveChanges() == 0)
+            {
+                return BadRequest(new ProblemDetails
+                {
+                    Title = "Database Error",
+                    Detail = "Error while writing to database"
+                });
+            }
+
+            return Ok(user.ConverToDto());
+        }
+
         [HttpPatch("/update-users")]
         [ProducesResponseType(200)]
         [ProducesResponseType(500)]
