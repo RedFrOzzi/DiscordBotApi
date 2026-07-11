@@ -14,6 +14,7 @@ namespace DiscordBotApi.Data.Raffles
         public string Answer_2 { get; set; } = string.Empty;
         public string Answer_3 { get; set; } = string.Empty;
         public string Answer_4 { get; set; } = string.Empty;
+        //test changes
         public DateTime CreatedAt { get; set; }
     }
 }

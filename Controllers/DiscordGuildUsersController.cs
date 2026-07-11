@@ -156,7 +156,7 @@ namespace DiscordBotApi.Controllers
         [HttpPatch("/user/change-iq")]
         [ProducesResponseType(200)]
         [ProducesResponseType(500)]
-        public IActionResult GiveUserIqPoints([FromBody] ulong userId, [FromBody] int iqPointsChange, CancellationToken cancellationToken)
+        public IActionResult GiveUserIqPoints([FromQuery] ulong userId, [FromQuery] int iqPointsChange, CancellationToken cancellationToken)
         {
             var user = _context.Users.FirstOrDefault(u => u.Id == userId);
             if (user == null)
