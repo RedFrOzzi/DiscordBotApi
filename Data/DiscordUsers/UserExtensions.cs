@@ -1,8 +1,8 @@
-﻿using NetCord;
+﻿using DiscordBotApi.Data.DiscordUsers.Dtos;
+using NetCord;
 using NetCord.Rest;
-using static NetCord.Mentionable;
 
-namespace DiscordBotApi.Data.Users
+namespace DiscordBotApi.Data.DiscordUsers
 {
     public static class UserExtensions
     {
@@ -17,7 +17,7 @@ namespace DiscordBotApi.Data.Users
                     Nickname = user.Nickname,
                     GlobalName = user.GlobalName,
                     ImageURL = user.ImageURL,
-                    UserIQ = user.UserIQ,
+                    UserResource = user.UserSpendingResource,
                 };
             }
         }
@@ -31,7 +31,7 @@ namespace DiscordBotApi.Data.Users
                 Username = user.Username,
                 Nickname = user.Nickname,
                 ImageURL= user.ImageURL,
-                UserIQ = user.UserIQ,
+                UserResource = user.UserSpendingResource,
             };
         }
 

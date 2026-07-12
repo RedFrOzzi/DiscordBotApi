@@ -1,4 +1,4 @@
-﻿namespace DiscordBotApi.Data.VoiceState
+﻿namespace DiscordBotApi.Data.VoiceStates
 {
     public class VoiceStateDto
     {

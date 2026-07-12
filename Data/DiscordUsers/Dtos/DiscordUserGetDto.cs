@@ -1,6 +1,7 @@
-﻿using DiscordBotApi.Data.VoiceState;
+﻿using DiscordBotApi.Data.VoiceStates;
+using NetCord.Gateway;
 
-namespace DiscordBotApi.Data.Users
+namespace DiscordBotApi.Data.DiscordUsers.Dtos
 {
     public class DiscordUserGetDto
     {
@@ -10,9 +11,9 @@ namespace DiscordBotApi.Data.Users
         public string? GlobalName { get; set; } = string.Empty;
         public string? ImageURL { get; set; } = string.Empty;
         public VoiceStateDto? VoiceState { get; set; }
-        public int UserIQ { get; set; }
+        public int UserResource { get; set; }
 
-        public void AddVoiceState(NetCord.Gateway.VoiceState voiceState)
+        public void AddVoiceState(VoiceState voiceState)
         {
             if (voiceState == null)
             {
@@ -20,9 +21,15 @@ namespace DiscordBotApi.Data.Users
                 return;
             }
 
+            string channelId;
+            if (voiceState.ChannelId == null)
+                channelId = "";
+            else
+                channelId = voiceState.ChannelId.ToString()!;
+
             VoiceState = new()
             {
-                ChannelId = voiceState.ChannelId?.ToString(),
+                ChannelId = channelId,
                 IsMuted = voiceState.IsMuted || voiceState.IsSelfMuted,
                 IsDeafened = voiceState.IsDeafened || voiceState.IsSelfDeafened,
             };

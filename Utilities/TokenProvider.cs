@@ -1,30 +1,22 @@
-﻿using DiscordBotApi.Data.Users;
-using DiscordBotApi.DiscordBot.Services.Secrets;
-using Microsoft.IdentityModel.Tokens;
+﻿using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json;
 using System.Security.Claims;
 using Microsoft.IdentityModel.JsonWebTokens;
+using DiscordBotApi.Data.ApiUsers;
 
 namespace DiscordBotApi.Utilities
 {
-    public class TokenProvider
+    public class TokenProvider(IConfiguration configuration)
     {
-        private readonly IConfiguration _configuration;
-        private readonly string _secret;
-
-        public TokenProvider(IConfiguration configuration, string secret)
-        {
-            _configuration = configuration;
-            _secret = secret;
-        }
+        private readonly string _secret = Environment.GetEnvironmentVariable("SECURITY_KEY") ?? throw new("Secret was null");
 
         public string Create(ApiUser apiUser)
         {
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            List<Claim> claims = [new Claim(JwtRegisteredClaimNames.Sub, apiUser.ApiUserId.ToString())];
+            List<Claim> claims = [new Claim(JwtRegisteredClaimNames.Sub, apiUser.Id.ToString())];
             if (apiUser.IsAdmin)
             {
                 claims.Add(new(ClaimTypes.Role, "Admin"));
@@ -33,10 +25,10 @@ namespace DiscordBotApi.Utilities
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(_configuration.GetValue<int>("Jwt:ExpirationInMinutes")),
+                Expires = DateTime.UtcNow.AddMinutes(configuration.GetValue<int>("Jwt:ExpirationInMinutes")),
                 SigningCredentials = credentials,
-                Issuer = _configuration["Jwt:Issuer"],
-                Audience = _configuration["Jwt:Audience"]
+                Issuer = configuration["Jwt:Issuer"],
+                Audience = configuration["Jwt:Audience"]
             };
 
             var handler = new JsonWebTokenHandler();

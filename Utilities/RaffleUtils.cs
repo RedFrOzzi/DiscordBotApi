@@ -32,7 +32,7 @@ namespace DiscordBotApi.Utilities
 
             foreach (var bet in userBets)
             {
-                bet.User.UserIQ += bet.BetAmount;
+                bet.User.UserSpendingResource += bet.BetAmount;
             }
 
             dbContext.SaveChanges();

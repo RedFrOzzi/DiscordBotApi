@@ -1,26 +1,41 @@
-﻿using DiscordBotApi.Data.Raffles;
-using DiscordBotApi.Database;
+﻿using DiscordBotApi.Database;
+using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Utilities;
+using DiscordBotApi.Utilities.Result;
 using NetCord;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
 
-namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
+namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService
 {
     [SlashCommand("игра", "Игра со ставками")]
     public class RaffleSlashCommandsModule : ApplicationCommandModule<ApplicationCommandContext>
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly ApplicationDbContext _dbContext;
+        private readonly RaffleAllowedUsersService _raffleAllowedUsersService;
 
-        public RaffleSlashCommandsModule(IServiceProvider serviceProvider)
+        public RaffleSlashCommandsModule(ApplicationDbContext dbContext, RaffleAllowedUsersService raffleAllowedUsersService)
         {
-            _serviceProvider = serviceProvider;
+            _dbContext = dbContext;
+            _raffleAllowedUsersService = raffleAllowedUsersService;
         }
 
         [SubSlashCommand("создать", "Создать вопрос для игры")]
         public async Task CreateRaffleModal()
         {
-            if (!await this.IsAuthorizedRoleOrUser()) { return; }
+            var result = await _raffleAllowedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext);
+            if (result is Error)
+            {
+                InteractionMessageProperties imsgp = new()
+                {
+                    Content = result.Message,
+                    Flags = MessageFlags.Ephemeral
+                };
+                var errorMsg = InteractionCallback.Message(imsgp);
+
+                await RespondAsync(errorMsg);
+                return;
+            }
 
             ModalProperties mProps = new(RaffleConstants.RaffleInitialModalId, "Создание игры")
             {
@@ -62,20 +77,7 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
         {
             await RespondAsync(InteractionCallback.DeferredMessage(MessageFlags.Ephemeral));
 
-            using var scope = _serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetService<ApplicationDbContext>();
-            if (dbContext == null)
-            {
-                InteractionMessageProperties errorMsgProps = new()
-                {
-                    Content = "Внутренняя ошибка",
-                    Flags = MessageFlags.Ephemeral
-                };
-                await RespondAsync(InteractionCallback.Message(errorMsgProps));
-                return;
-            }
-
-            var user = dbContext.Users.FirstOrDefault(u => u.Id == Context.User.Id);
+            var user = _dbContext.GetUser(Context.User.Id);
             if (user == null)
             {
                 InteractionMessageProperties errorMsgProps = new()
@@ -87,16 +89,7 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
                 return;
             }
 
-            var userBets = dbContext.UserBets
-                .Where(ub => ub.User.Id == Context.User.Id)
-                .Select(ub => new UserBet
-                {
-                    Id = ub.Id,
-                    AnswerNumber = ub.AnswerNumber,
-                    BetAmount = ub.BetAmount,
-                    CreatedAt = ub.CreatedAt,
-                })
-                .ToArray();
+            var userBets = _dbContext.GetUserBets(user.Id);
             var allBetsAmount = userBets.Sum(ub => ub.BetAmount);
             var maxBet = userBets.Max(ub => ub.BetAmount);
             var latest = userBets.Aggregate((current, next) =>
@@ -109,19 +102,19 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
 
             EmbedFieldProperties embedField = new()
             {
-                Name = $"IQ: {user.UserIQ} поинтов",
+                Name = $"Ресурс: {user.UserSpendingResource} очков",
             };
 
             EmbedFieldProperties embedField1 = new()
             {
                 Name = "Всего ставок:",
-                Value = $"{userBets.Length} на {allBetsAmount} поинтов",
+                Value = $"{userBets.Length} на {allBetsAmount} очков",
             };
 
             EmbedFieldProperties embedField2 = new()
             {
                 Name = "Максимальная ставка:",
-                Value = $"{maxBet} поинтов",
+                Value = $"{maxBet} очков",
             };
 
             EmbedFieldProperties? embedField3 = null;

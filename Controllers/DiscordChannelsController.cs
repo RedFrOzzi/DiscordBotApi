@@ -13,7 +13,7 @@ namespace DiscordBotApi.Controllers
         private readonly ApplicationDbContext _context;
         private readonly GatewayClient _client;
 
-        public DiscordChannelsController(ApplicationDbContext context, [FromKeyedServices("client")] GatewayClient client)
+        public DiscordChannelsController(ApplicationDbContext context, GatewayClient client)
         {
             _context = context;
             _client = client;

@@ -1,5 +1,4 @@
-﻿using DiscordBotApi.DiscordBot.Services.Secrets;
-using NetCord;
+﻿using NetCord;
 using NetCord.Gateway;
 using NetCord.Logging;
 using System.Text.Json;
@@ -10,21 +9,9 @@ namespace DiscordBotApi.DiscordBot
     {
         public static GatewayClient CreateBotClient([FromKeyedServices("writer")] StreamWriter textWriter)
         {
-            Console.WriteLine("Initializing discord bot");
+            Console.WriteLine($"{DateTime.UtcNow}: Initializing discord bot");
 
-            string token;
-
-            if (!File.Exists(AppDomain.CurrentDomain.BaseDirectory + "/secrets.txt"))
-            {
-                throw new Exception($"secrets not found in base directory {AppDomain.CurrentDomain.BaseDirectory}");
-            }
-            else
-            {
-                var secretsJson = JsonSerializer.Deserialize<SecretsJson>(File.ReadAllText(AppDomain.CurrentDomain.BaseDirectory + "/secrets.txt"))
-                    ?? throw new Exception($"could not deserialize json file");
-
-                token = secretsJson.Token ?? throw new Exception($"secrets file does not contain token");
-            }
+            string token = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN") ?? throw new("Discord token was null");
 
             textWriter.WriteLine($"{DateTime.UtcNow}: Starting bot");
 

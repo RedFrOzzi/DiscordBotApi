@@ -1,4 +1,4 @@
-﻿using DiscordBotApi.Data.Users;
+﻿using DiscordBotApi.Data.DiscordUsers;
 using DiscordBotApi.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +15,7 @@ namespace DiscordBotApi.Controllers
         private readonly ApplicationDbContext _context;
         private readonly GatewayClient _client;
 
-        public DiscordGuildsController(ApplicationDbContext context, [FromKeyedServices("client")] GatewayClient client)
+        public DiscordGuildsController(ApplicationDbContext context, GatewayClient client)
         {
             _context = context;
             _client = client;

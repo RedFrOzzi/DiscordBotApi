@@ -1,4 +1,5 @@
-﻿using DiscordBotApi.Data.Users;
+﻿using DiscordBotApi.Data.DiscordUsers;
+using DiscordBotApi.Data.DiscordUsers.Dtos;
 using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Utilities;
@@ -18,7 +19,7 @@ namespace DiscordBotApi.Controllers
         private readonly ApplicationDbContext _context;
         private readonly UpdateUsersService _updateService;
 
-        public DiscordGuildUsersController([FromKeyedServices("client")] GatewayClient client, ApplicationDbContext context, UpdateUsersService updateService)
+        public DiscordGuildUsersController(GatewayClient client, ApplicationDbContext context, UpdateUsersService updateService)
         {
             _client = client;
             _context = context;
@@ -129,6 +130,21 @@ namespace DiscordBotApi.Controllers
             return Ok(users.ConvertToDto());
         }
 
+        [HttpGet("/get-users-update-progress")]
+        [ProducesResponseType(200)]
+        [ProducesResponseType(404)]
+        [ProducesResponseType(500)]
+        public async Task<IActionResult> GetUsersUpdateProgress(CancellationToken cancellationToken)
+        {
+            if (_updateService == null)
+                return NotFound();
+
+            if (!_updateService.IsInUpdateState)
+                return BadRequest("Update is not running");
+
+            return Ok(_updateService.ProcessedPercent);
+        }
+
         [HttpPut("/user/save-data")]
         [ProducesResponseType(201)]
         [ProducesResponseType(500)]
@@ -153,18 +169,18 @@ namespace DiscordBotApi.Controllers
             return Problem(statusCode: 500, title: "Not saved", detail: "Database error");
         }
 
-        [HttpPatch("/user/change-iq")]
+        [HttpPatch("/user/change-user-resource")]
         [ProducesResponseType(200)]
         [ProducesResponseType(500)]
-        public IActionResult GiveUserIqPoints([FromQuery] ulong userId, [FromQuery] int iqPointsChange, CancellationToken cancellationToken)
+        public IActionResult GiveUserIqPoints([FromQuery] ulong userId, [FromQuery] int resourcePointsChange, CancellationToken cancellationToken)
         {
-            var user = _context.Users.FirstOrDefault(u => u.Id == userId);
+            var user = _context.DiscordUsers.FirstOrDefault(u => u.Id == userId);
             if (user == null)
             {
                 return NotFound();
             }
 
-            user.UserIQ += iqPointsChange;
+            user.UserSpendingResource += resourcePointsChange;
             if (_context.SaveChanges() == 0)
             {
                 return BadRequest(new ProblemDetails

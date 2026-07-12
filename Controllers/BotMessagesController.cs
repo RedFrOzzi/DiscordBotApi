@@ -13,7 +13,7 @@ namespace DiscordBotApi.Controllers
     {
         readonly GatewayClient _client;
 
-        public BotMessagesController([FromKeyedServices("client")] GatewayClient client)
+        public BotMessagesController(GatewayClient client)
         {
             _client = client;
         }
@@ -73,19 +73,10 @@ namespace DiscordBotApi.Controllers
                 return BadRequest("Bot service is not working");
             }
 
-            await _client.Rest.DeleteMessagesAsync(channelId, GetMessages(_client.Rest, channelId), cancellationToken: cancellationToken);
+            var botMessages = await GetMessages(_client.Rest, channelId);
+            await _client.Rest.DeleteMessagesAsync(channelId, botMessages, cancellationToken: cancellationToken);
 
             return Ok();
-
-            static async IAsyncEnumerable<ulong> GetMessages(RestClient client, ulong channelId)
-            {
-                await foreach (var msg in client.GetMessagesAsync(channelId))
-                {
-                    if (msg == null || !msg.Author.IsBot) { continue; }
-
-                    yield return msg.Id;
-                }
-            }
         }
 
         [HttpDelete("/delete-message")]
@@ -111,19 +102,40 @@ namespace DiscordBotApi.Controllers
                 return BadRequest("Bot service is not working");
             }
 
-            await _client.Rest.DeleteMessagesAsync(channelId, GetMessages(_client.Rest, channelId, userId), cancellationToken: cancellationToken);
+            var messageIds = await GetMessages(_client.Rest, channelId, userId);
+            await _client.Rest.DeleteMessagesAsync(channelId, messageIds, cancellationToken: cancellationToken);
 
             return Ok();
 
-            static async IAsyncEnumerable<ulong> GetMessages(RestClient client, ulong channelId, ulong userId)
+            static async Task<List<ulong>> GetMessages(RestClient client, ulong channelId, ulong userId)
             {
+                List<ulong> ids = [];
                 await foreach (var msg in client.GetMessagesAsync(channelId))
                 {
-                    if (msg == null || msg.Author.Id != userId) { continue; }
+                    if (msg == null || msg.Author.Id != userId)
+                        continue;
 
-                    yield return msg.Id;
+                    ids.Add(msg.Id);
                 }
+                return ids;
             }
+        }
+
+
+
+
+        static async Task<List<ulong>> GetMessages(RestClient client, ulong channelId)
+        {
+            List<ulong> msgIds = [];
+            await foreach (var msg in client.GetMessagesAsync(channelId))
+            {
+                if (msg == null || !msg.Author.IsBot)
+                    continue;
+
+                msgIds.Add(msg.Id);
+            }
+
+            return msgIds;
         }
     }
 }

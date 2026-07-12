@@ -1,12 +1,11 @@
-﻿using DiscordBotApi.Data.Users;
+﻿using DiscordBotApi.Data.DiscordUsers;
 using System.ComponentModel.DataAnnotations;
 
 namespace DiscordBotApi.Data.Raffles
 {
     public class UserBet
     {
-        [Key]
-        public int Id { get; set; }
+        [Key] public int Id { get; set; }
         public Raffle Raffle { get; set; } = null!;
         public DiscordUser User { get; set; } = null!;
         public string UserName { get; set; } = string.Empty;

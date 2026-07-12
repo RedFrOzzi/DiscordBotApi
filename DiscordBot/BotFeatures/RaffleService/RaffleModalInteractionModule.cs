@@ -2,19 +2,18 @@
 using DiscordBotApi.Database;
 using DiscordBotApi.Utilities;
 using NetCord;
-using NetCord.Gateway;
 using NetCord.Rest;
 using NetCord.Services.ComponentInteractions;
 
-namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
+namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService
 {
     public class RaffleModalInteractionModule : ComponentInteractionModule<ModalInteractionContext>
     {
-        private readonly IServiceProvider _serviceProvider;
+        private readonly ApplicationDbContext _dbContext;
 
-        public RaffleModalInteractionModule(IServiceProvider serviceProvider) 
+        public RaffleModalInteractionModule(ApplicationDbContext dbContext) 
         {
-            _serviceProvider = serviceProvider;
+            _dbContext = dbContext;
         }
 
         //Respond to game creation command
@@ -33,10 +32,7 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
                 return;
             }
 
-            using var serviceScope = _serviceProvider.CreateScope();
-            var dbContext = serviceScope.ServiceProvider.GetService<ApplicationDbContext>();
-
-            if (dbContext == null || !dbContext.TryCreateNewRaffle(new Raffle(), out var insertedRaffleId))
+            if (!_dbContext.TryCreateNewRaffle(new Raffle(), out var insertedRaffleId))
             {
                 InteractionMessageProperties errorMsgProps = new()
                 {
@@ -164,7 +160,7 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
 
             raffle.AnswerButtonsMessageId = message.Resource.Message.Id;
 
-            if (!dbContext.TryUpdateRaffle(insertedRaffleId, raffle))
+            if (!_dbContext.TryUpdateRaffle(insertedRaffleId, raffle))
             {
                 InteractionMessageProperties errorMsgProps = new()
                 {
@@ -184,7 +180,8 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
             int answerNum = -1;
             foreach (var component in Context.Components)
             {
-                if (component is not Label label || label.Component is not StringMenu menu || menu.SelectedValues?.Count < 1) { continue; }
+                if (component is not Label label || label.Component is not StringMenu menu || menu.SelectedValues?.Count < 1)
+                continue;
 
                 int.TryParse(menu.SelectedValues![0], out answerNum);
             }
@@ -200,28 +197,13 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
                 return;
             }
 
-            using var serviceScope = _serviceProvider.CreateScope();
-            var dbContext = serviceScope.ServiceProvider.GetService<ApplicationDbContext>();
-
-            if (dbContext == null)
-            {
-                InteractionMessageProperties imsgp = new()
-                {
-                    Content = "Внутренняя ошибка",
-                    Flags = MessageFlags.Ephemeral
-                };
-
-                await RespondAsync(InteractionCallback.Message(imsgp));
-                return;
-            }
-
-            var raffle = dbContext.GetRaffle(raffleId);
+            var raffle = _dbContext.GetRaffle(raffleId);
 
             if (raffle == null || raffle.IsClosed)
             {
                 InteractionMessageProperties imsgp = new()
                 {
-                    Content = "Эта игра уже закрыта или её вообще нет",
+                    Content = "Эта игра уже закрыта или её нет",
                     Flags = MessageFlags.Ephemeral
                 };
 
@@ -229,7 +211,7 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
                 return;
             }
 
-            var userBets = dbContext.GetUsersBets(raffle);
+            var userBets = _dbContext.GetUsersBets(raffle);
 
             if (userBets.Length <= 1)
             {
@@ -250,13 +232,13 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
                 var discordUser = userBets[i].User;
                 if (discordUser == null) { continue; }
 
-                int resourceChange = GetUserIQChange(userBets[i], answerNum, totalLosersBets, totalWinnersBets, RaffleConstants.AdditionalIQOnWin);
-                userBets[i].User.UserIQ += resourceChange;
+                int resourceChange = GetUserResourceChange(userBets[i], answerNum, totalLosersBets, totalWinnersBets, RaffleConstants.AdditionalIQOnWin);
+                userBets[i].User.UserSpendingResource += resourceChange;
             }
 
             raffle.IsClosed = true;
 
-            dbContext.SaveChanges();
+            _dbContext.SaveChanges();
 
             //Delete message with buttons from discord
             if (raffle.AnswerButtonsMessageId != 0)
@@ -279,20 +261,7 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
         [ComponentInteraction(RaffleConstants.BetAmountModalId)]
         public async Task RespondToAnswerGiven(int answerNum, int maxUserBetAmount, int raffleId)
         {
-            using var scope = _serviceProvider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetService<ApplicationDbContext>();
-            if (dbContext == null)
-            {
-                InteractionMessageProperties errorMsgProps = new()
-                {
-                    Content = "Внутренняя ошибка",
-                    Flags = MessageFlags.Ephemeral
-                };
-                await RespondAsync(InteractionCallback.Message(errorMsgProps));
-                return;
-            }
-
-            var raffle = dbContext.GetRaffle(raffleId);
+            var raffle = _dbContext.GetRaffle(raffleId);
             if (Context == null || Context.Components == null || Context.Components.Count == 0 || raffle == null)
             {
                 InteractionMessageProperties errorMsgProps = new()
@@ -304,7 +273,7 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
                 return;
             }
 
-            var user = dbContext.GetUser(Context.User.Id);
+            var user = _dbContext.GetUser(Context.User.Id);
             if (user == null)
             {
                 InteractionMessageProperties errorMsgProps = new()
@@ -342,7 +311,7 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
                 AnswerNumber = answerNum,
                 CreatedAt = DateTime.UtcNow.AddHours(3),
             };
-            if (!dbContext.TryAddUserBet(newUserBet))
+            if (!_dbContext.TryAddUserBet(newUserBet))
             {
                 InteractionMessageProperties errorMsgProps = new()
                 {
@@ -353,17 +322,17 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
                 return;
             }
 
-            dbContext.ChangeUserIqPoints(user.PrimaryKey, -bet);
+            _dbContext.ChangeUserResourcePoints(user.Key, -bet);
 
             await RespondAsync(InteractionCallback.DeferredModifyMessage);
             await Context.Client.Rest.ModifyMessageAsync(Context.Channel.Id, raffle.AnswerButtonsMessageId, RebuildMessage);
 
             void RebuildMessage(MessageOptions options)
             {
-                var betsWithAnswer_1 = dbContext.GetUsersBetsByAnswerNum(raffle, 1);
-                var betsWithAnswer_2 = dbContext.GetUsersBetsByAnswerNum(raffle, 2);
-                var betsWithAnswer_3 = dbContext.GetUsersBetsByAnswerNum(raffle, 3);
-                var betsWithAnswer_4 = dbContext.GetUsersBetsByAnswerNum(raffle, 4);
+                var betsWithAnswer_1 = _dbContext.GetUsersBetsByAnswerNum(raffle, 1);
+                var betsWithAnswer_2 = _dbContext.GetUsersBetsByAnswerNum(raffle, 2);
+                var betsWithAnswer_3 = _dbContext.GetUsersBetsByAnswerNum(raffle, 3);
+                var betsWithAnswer_4 = _dbContext.GetUsersBetsByAnswerNum(raffle, 4);
 
                 ButtonProperties buttonEndRaffle = new($"{RaffleConstants.ButtonEndRaffleId}:{raffle.Id}", "Завершить", NetCord.ButtonStyle.Primary);
                 ButtonProperties buttonAnswer_1 = new(RaffleConstants.ButtonAnswer_1_Id, "Ответ № 1", NetCord.ButtonStyle.Primary);
@@ -449,7 +418,7 @@ namespace DiscordBotApi.DiscordBot.Services.BotFeatures.RaffleService
             }
         }
 
-        private static int GetUserIQChange(UserBet userBet, int correctAnswerNum, int totalLosersBets, int totalWinnersBets, int additionalFixedReward)
+        private static int GetUserResourceChange(UserBet userBet, int correctAnswerNum, int totalLosersBets, int totalWinnersBets, int additionalFixedReward)
         {
             if (correctAnswerNum != userBet.AnswerNumber)
             {

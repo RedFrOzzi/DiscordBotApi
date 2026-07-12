@@ -10,6 +10,8 @@ ApplicationData.db-wal
 bot_logs.log
 secrets.json
 
+.env
+
 # User-specific files
 *.rsuser
 *.suo
