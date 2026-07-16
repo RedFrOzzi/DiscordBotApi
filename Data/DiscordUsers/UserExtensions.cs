@@ -58,5 +58,20 @@ namespace DiscordBotApi.Data.DiscordUsers
                 ImageURL = null,
             };
         }
+
+        public static List<DiscordUser> ConvertToDiscordUsers(this Dictionary<ulong, GuildUser> guildUsers)
+        {
+            List<DiscordUser> dUsers = [];
+
+            if (guildUsers == null)
+                return dUsers;
+
+            foreach (var gUser in guildUsers)
+            {
+                dUsers.Add(ConvertToDiscordUser(gUser.Value));
+            }
+
+            return dUsers;
+        }
     }
 }

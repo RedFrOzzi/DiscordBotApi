@@ -1,6 +1,6 @@
 ﻿namespace DiscordBotApi.Utilities.Result;
 
-public sealed class Success<T> : Result
+public sealed class Success<T> : Result<T>
 {
     public Success() { }
 

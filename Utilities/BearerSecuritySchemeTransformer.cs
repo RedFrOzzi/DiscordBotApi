@@ -39,6 +39,9 @@ internal sealed class BearerSecuritySchemeTransformer : IOpenApiDocumentTransfor
 
         foreach (var path in document.Paths.Values)
         {
+            if (path == null || path.Operations == null)
+                continue;
+
             foreach (var operation in path.Operations.Values)
             {
                 operation.Security ??= new List<OpenApiSecurityRequirement>();

@@ -6,49 +6,77 @@ using DiscordBotApi.Data.Raffles;
 using DiscordBotApi.Data.Roles;
 using Microsoft.EntityFrameworkCore;
 
-namespace DiscordBotApi.Database
+namespace DiscordBotApi.Database;
+
+public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
-    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+    public DbSet<ApiUser> ApiUsers { get; set; }
+    public DbSet<DiscordGuild> Guilds { get; set; }
+    public DbSet<DiscordChannel> Channels { get; set; }
+    public DbSet<DiscordGuildRole> DiscordGuildRoles { get; set; }
+    public DbSet<DiscordUser> DiscordUsers { get; set; }
+
+    //Raffle
+    public DbSet<RaffleSettings> RaffleSettings { get; set; }
+    public DbSet<Raffle> Rafles { get; set; }
+    public DbSet<UserBet> UserBets { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        public DbSet<ApiUser> ApiUsers { get; set; }
-        public DbSet<DiscordGuild> Guilds { get; set; }
-        public DbSet<DiscordChannel> Channels { get; set; }
-        public DbSet<DiscordGuildRole> DiscordChannelRole { get; set; }
-        public DbSet<DiscordUser> DiscordUsers { get; set; }
+        base.OnModelCreating(modelBuilder);
 
-        //Raffle
-        public DbSet<RaffleSettings> RaffleSettings { get; set; }
-        public DbSet<Raffle> Rafles { get; set; }
-        public DbSet<UserBet> UserBets { get; set; }
+        modelBuilder.Entity<DiscordGuild>()
+            .Property(u => u.Id)
+            .HasColumnType("INTEGER");
 
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        modelBuilder.Entity<DiscordChannel>()
+            .Property(u => u.Id)
+            .HasColumnType("INTEGER");
+
+        modelBuilder.Entity<DiscordGuildRole>()
+            .Property(u => u.Id)
+            .HasColumnType("INTEGER");
+
+        modelBuilder.Entity<DiscordUser>()
+            .Property(u => u.Id)
+            .HasColumnType("INTEGER");
+
+        modelBuilder.Entity<DiscordUser>()
+            .HasMany(u => u.Guilds)
+            .WithMany(g => g.Users)
+            .UsingEntity(j => j.ToTable("UserGuilds"));
+
+        modelBuilder.Entity<DiscordGuild>()
+            .HasOne(g => g.Owner)
+            .WithMany()
+            .HasForeignKey("OwnerId")
+            .IsRequired()
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ApiUser>(entity =>
         {
-            modelBuilder.Entity<ApiUser>(entity =>
-            {
-                entity.HasAlternateKey(u => u.Id);
-                entity.HasIndex(u => u.Login).IsUnique();
-            });
+            entity.HasAlternateKey(u => u.Id);
+            entity.HasIndex(u => u.Login).IsUnique();
+        });
 
-            modelBuilder.Entity<DiscordUser>(entity =>
-            {
-                entity.HasIndex(u => u.Id);
-                entity.HasAlternateKey(u => u.Username);
-            });
+        modelBuilder.Entity<DiscordUser>(entity =>
+        {
+            entity.HasIndex(u => u.Id);
+        });
 
-            modelBuilder.Entity<DiscordGuild>(entity =>
-            {
-                entity.HasAlternateKey(g =>  g.Id);
-            });
+        modelBuilder.Entity<DiscordGuild>(entity =>
+        {
+            entity.HasAlternateKey(g =>  g.Id);
+        });
 
-            modelBuilder.Entity<DiscordChannel>(entity =>
-            {
-                entity.HasAlternateKey(c => c.Id);
-            });
+        modelBuilder.Entity<DiscordChannel>(entity =>
+        {
+            entity.HasAlternateKey(c => c.Id);
+        });
 
-            modelBuilder.Entity<DiscordChannel>(entity =>
-            {
-                entity.HasAlternateKey(c => c.Id);
-            });
-        }
+        modelBuilder.Entity<DiscordChannel>(entity =>
+        {
+            entity.HasAlternateKey(c => c.Id);
+        });
     }
 }

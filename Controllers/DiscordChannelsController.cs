@@ -1,90 +1,65 @@
-﻿using DiscordBotApi.Database;
+﻿using DiscordBotApi.Data.Channels;
+using DiscordBotApi.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using NetCord;
 using NetCord.Gateway;
 
-namespace DiscordBotApi.Controllers
+namespace DiscordBotApi.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+[Authorize(Roles = "Admin")]
+public class DiscordChannelsController(ApplicationDbContext context, GatewayClient client) : ControllerBase
 {
-    [ApiController]
-    [Route("[controller]")]
-    [Authorize(Roles = "Admin")]
-    public class DiscordChannelsController : ControllerBase
+    readonly ApplicationDbContext _context = context;
+    readonly GatewayClient _client = client;
+
+    [HttpGet("/channels/get-channels")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetChannels()
     {
-        private readonly ApplicationDbContext _context;
-        private readonly GatewayClient _client;
+        var channels = _context.Channels
+            .AsNoTracking()
+            .Select(c => new DiscordChannelGetDto()
+            {
+                Id = c.Id.ToString(),
+                Name = c.Name,
+                IsTextChannel = c.IsTextChannel,
+                GuildId = c.Guild.Id.ToString(),
+            })
+            .ToList();
 
-        public DiscordChannelsController(ApplicationDbContext context, GatewayClient client)
+        if (channels == null || channels.Count == 0)
         {
-            _context = context;
-            _client = client;
+            return NotFound();
         }
 
-        [HttpGet("/channel/get-channels")]
-        [ProducesResponseType(200)]
-        [ProducesResponseType(404)]
-        public async Task<IActionResult> GetChannels(CancellationToken cancellationToken)
-        {
-            var channels = await _context.GetChannelDtosAsync(cancellationToken);
-            if (channels == null || channels.Count == 0)
-            {
-                return NotFound();
-            }
+        return Ok(channels);
+    }
 
-            return Ok(channels);
+    [HttpGet("/channels/get-discord-channels")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetChannelsFromDiscord([FromQuery] ulong guildId, CancellationToken cancellationToken)
+    {
+        var channels = await _client.Rest.GetGuildChannelsAsync(guildId, cancellationToken: cancellationToken);
+
+        if (channels == null || channels.Count == 0)
+        {
+            return NotFound();
         }
 
-        [HttpPut("/channel/save-data")]
-        [ProducesResponseType(201)]
-        [ProducesResponseType(500)]
-        public async Task<IActionResult> SaveDataToDatabase([FromQuery] ulong guildId, CancellationToken cancellationToken)
+        var channelDtos = channels.Select(c => new DiscordChannelGetDto()
         {
-            if (_client == null)
-            {
-                return BadRequest("Bot service is not working");
-            }
+            Id = c.Id.ToString(),
+            Name = c.Name,
+            IsTextChannel = c is not VoiceGuildChannel,
+            GuildId = guildId.ToString(),
+        });
 
-            var guild = await _client.Rest.GetGuildAsync(guildId, cancellationToken: cancellationToken);
-            var cahnnels = await guild.GetChannelsAsync(cancellationToken: cancellationToken);
-            var discordGuild = await _context.GetGuild(guildId, cancellationToken);
-
-            if (discordGuild == null)
-            {
-                return NotFound();
-            }
-
-            if (_context.SaveNewChannelsData(discordGuild, cahnnels))
-            {
-                return Created();
-            }
-
-            return Problem(statusCode: 500, title: "Not saved", detail: "Database error");
-        }
-
-        [HttpPut("/channel/update-data")]
-        [ProducesResponseType(202)]
-        [ProducesResponseType(500)]
-        public async Task<IActionResult> UpdateDataToDatabase([FromQuery] ulong guildId, CancellationToken cancellationToken)
-        {
-            if (_client == null)
-            {
-                return BadRequest("Bot service is not working");
-            }
-
-            var guild = await _client.Rest.GetGuildAsync(guildId, cancellationToken: cancellationToken);
-            var cahnnels = await guild.GetChannelsAsync(cancellationToken: cancellationToken);
-            var dicordGuild = await _context.GetGuild(guildId, cancellationToken);
-
-            if (dicordGuild == null)
-            {
-                return NotFound();
-            }
-
-            if (_context.UpdateChannelsData(dicordGuild, cahnnels))
-            {
-                return Accepted();
-            }
-
-            return Problem(statusCode: 500, title: "Not saved", detail: "Database error");
-        }
+        return Ok(channelDtos);
     }
 }

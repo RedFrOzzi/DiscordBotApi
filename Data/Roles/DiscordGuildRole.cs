@@ -9,5 +9,6 @@ public class DiscordGuildRole
     [Key] public int Key { get; set; }
     [Required] public ulong Id { get; set; }
     [Required] public DiscordGuild DiscordGuild { get; set; } = null!;
-    public ICollection<DiscordUser>? DiscordUsersWithRole { get; set; }
+    public string? Name { get; set; }
+    public ICollection<DiscordUser> DiscordUsersWithRole { get; set; } = [];
 }

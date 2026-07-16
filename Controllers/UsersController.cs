@@ -1,8 +1,10 @@
-﻿using DiscordBotApi.Data.ApiUsers.Dtos;
+﻿using DiscordBotApi.Data.ApiUsers;
+using DiscordBotApi.Data.ApiUsers.Dtos;
 using DiscordBotApi.Database;
 using DiscordBotApi.Utilities;
 using DiscordBotApi.Utilities.Result;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace DiscordBotApi.Controllers
 {
@@ -36,14 +38,26 @@ namespace DiscordBotApi.Controllers
                 });
             }
 
-            var passwordHash = _passwordHasher.GetHash(userDto.Password);
-            var isCreatedResult = _context.CreateApiUser(userDto.Login, passwordHash);
+            if (_context.ApiUsers.Any(u => u.Login == userDto.Login))
+            {
+                return BadRequest(new ProblemDetails()
+                {
+                    Status = StatusCodes.Status409Conflict,
+                    Detail = "Already exist"
+                });
+            }
 
-            if (isCreatedResult is AlreadyExistError existError)
-                return BadRequest(existError.Message);
-            
-            if (isCreatedResult is Error error)
-                return Problem(error.Message, statusCode: StatusCodes.Status500InternalServerError);
+            var user = new ApiUser
+            {
+                Login = userDto.Login,
+                PasswordHash = _passwordHasher.GetHash(userDto.Password)
+            };
+
+            _context.ApiUsers.Add(user);
+            if (_context.SaveChanges() > 0)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }                
 
             return Created();
         }
@@ -63,7 +77,9 @@ namespace DiscordBotApi.Controllers
                 });
             }
 
-            var apiUser = _context.GetApiUser(userDto.Login);
+            var apiUser = _context.ApiUsers
+                .AsNoTracking()
+                .FirstOrDefault(u => u.Login == userDto.Login);
 
             if (apiUser == null)
                 return Unauthorized("Wrong login or password");
@@ -94,19 +110,34 @@ namespace DiscordBotApi.Controllers
             var storedKeyword = Environment.GetEnvironmentVariable("ADMIN_INITIALIZATION_PASSWORD");
             if (string.IsNullOrEmpty(storedKeyword))
             {
-                return Problem(statusCode: StatusCodes.Status500InternalServerError, detail: "Server Issue");
+                return StatusCode(StatusCodes.Status500InternalServerError);
             }
 
-            if (string.Equals(apiUserAddAdminDto.Keyword, storedKeyword, StringComparison.Ordinal) &&
-                _context.FindUserAndAddAdminStatus(apiUserAddAdminDto.UserLogin))
+            var user = _context.ApiUsers.FirstOrDefault(u => u.Login == apiUserAddAdminDto.UserLogin);
+            if (user == null)
             {
+                return NotFound(new ProblemDetails()
+                {
+                    Status = StatusCodes.Status404NotFound,
+                    Detail = "User not found"
+                });
+            }
+
+            if (string.Equals(apiUserAddAdminDto.Keyword, storedKeyword, StringComparison.Ordinal))
+            {
+                user.IsAdmin = true;
+                if (_context.SaveChanges() > 0)
+                {
+                    return StatusCode(StatusCodes.Status500InternalServerError);
+                }
+
                 return Ok();
             }
 
             return BadRequest(new ProblemDetails()
             {
                 Status = StatusCodes.Status400BadRequest,
-                Detail = "Keyword was not accepted"
+                Detail = "Data error"
             });
         }
     }

@@ -5,8 +5,10 @@ using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using NetCord;
 using NetCord.Gateway;
+using static NetCord.Mentionable;
 
 namespace DiscordBotApi.Controllers
 {
@@ -119,15 +121,27 @@ namespace DiscordBotApi.Controllers
         [ProducesResponseType(200)]
         [ProducesResponseType(404)]
         [ProducesResponseType(500)]
-        public async Task<IActionResult> GetUsersFromDb(CancellationToken cancellationToken)
+        public async Task<IActionResult> GetUsersFromDb()
         {
-            var users = await _context.GetUsers(cancellationToken);
+            var users = _context.DiscordUsers
+                .AsNoTracking()
+                .Select(user => new DiscordUserGetDto()
+                    {
+                        Id = user.Id.ToString(),
+                        Username = user.Username,
+                        Nickname = user.Nickname,
+                        GlobalName = user.GlobalName,
+                        ImageURL = user.ImageURL,
+                        UserResource = user.UserSpendingResource,
+                    })
+                .ToList();
+
             if (users == null || users.Count == 0)
             {
                 return NotFound();
             }
 
-            return Ok(users.ConvertToDto());
+            return Ok(users);
         }
 
         [HttpGet("/get-users-update-progress")]
@@ -143,30 +157,6 @@ namespace DiscordBotApi.Controllers
                 return BadRequest("Update is not running");
 
             return Ok(_updateService.ProcessedPercent);
-        }
-
-        [HttpPut("/user/save-data")]
-        [ProducesResponseType(201)]
-        [ProducesResponseType(500)]
-        public async Task<IActionResult> SaveDataToDatabase([FromQuery] ulong guildId, CancellationToken cancellationToken)
-        {
-            if (_client == null)
-            {
-                return BadRequest("Bot service is not working");
-            }
-
-            List<GuildUser> users = [];
-            await foreach (var user in _client.Rest.GetGuildUsersAsync(guildId))
-            {
-                users.Add(user);
-            }
-
-            if (_context.SaveNewUsersData(users))
-            {
-                return Created();
-            }
-
-            return Problem(statusCode: 500, title: "Not saved", detail: "Database error");
         }
 
         [HttpPatch("/user/change-user-resource")]

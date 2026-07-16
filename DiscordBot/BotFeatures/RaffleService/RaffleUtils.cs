@@ -1,7 +1,7 @@
 ﻿using DiscordBotApi.Data.Raffles;
 using DiscordBotApi.Database;
 
-namespace DiscordBotApi.Utilities
+namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService
 {
     public static class RaffleUtils
     {

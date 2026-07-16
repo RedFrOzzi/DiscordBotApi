@@ -1,5 +1,5 @@
 ﻿using DiscordBotApi.Database;
-using DiscordBotApi.Utilities;
+using DiscordBotApi.DiscordBot.BotFeatures.RaffleService;
 using NetCord;
 using NetCord.Gateway;
 using NetCord.Rest;

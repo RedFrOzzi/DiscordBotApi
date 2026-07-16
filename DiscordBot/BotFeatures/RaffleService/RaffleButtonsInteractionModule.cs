@@ -1,7 +1,7 @@
 ﻿using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot.Services;
-using DiscordBotApi.Utilities;
 using DiscordBotApi.Utilities.Result;
+using Microsoft.EntityFrameworkCore;
 using NetCord;
 using NetCord.Rest;
 using NetCord.Services.ComponentInteractions;
@@ -101,7 +101,10 @@ public class RaffleButtonsInteractionModule : ComponentInteractionModule<ButtonI
 
     private async Task SendAnswerModal(int answerNum)
     {
-        var userInDb = _dbContext.GetUser(Context.User.Id);
+        var userInDb = _dbContext.DiscordUsers
+            .AsNoTracking()
+            .FirstOrDefault(u => u.Id == Context.User.Id);
+
         if (userInDb == null)
         {
             InteractionMessageProperties errorMsgProps = new()
@@ -113,7 +116,11 @@ public class RaffleButtonsInteractionModule : ComponentInteractionModule<ButtonI
             return;
         }
 
-        var raffle = _dbContext.GetRaffleWithAnswerButtonsMessageId(Context.Message.Id);
+        //Get raffle with answer buttons message id
+        var raffle = _dbContext.Rafles
+            .AsNoTracking()
+            .FirstOrDefault(r => r.AnswerButtonsMessageId == Context.Message.Id);
+
         if (raffle == null)
         {
             InteractionMessageProperties errorMsgProps = new()
@@ -125,7 +132,7 @@ public class RaffleButtonsInteractionModule : ComponentInteractionModule<ButtonI
             return;
         }
 
-        if (_dbContext.IsUserAlreadyBetInThisGame(raffle.Id, Context.User.Id))
+        if (_dbContext.UserBets.Any(b => b.Raffle.Id == raffle.Id && b.User.Id == Context.User.Id))
         {
             InteractionMessageProperties errorMsgProps = new()
             {

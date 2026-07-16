@@ -1,4 +1,4 @@
-﻿namespace DiscordBotApi.Utilities
+﻿namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService
 {
     public static class RaffleConstants
     {

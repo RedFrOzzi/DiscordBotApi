@@ -1,5 +1,7 @@
 ﻿using DiscordBotApi.Database;
+using DiscordBotApi.Utilities;
 using DiscordBotApi.Utilities.Result;
+using Microsoft.EntityFrameworkCore;
 using NetCord;
 using NetCord.Services;
 
@@ -16,15 +18,25 @@ public class RaffleAllowedUsersService
         if (guildUser.Id == context.Guild.OwnerId)
             return Success.Empty;
 
-        var allowedRoles = dbContext.GetAllowedRoleIds(context.Guild.Id);
+        var adminIds = Environment.GetEnvironmentVariablesArrayAsUlong("ADMIN_IDS");
+        if (adminIds != null && adminIds.Count > 0 && adminIds.Contains(guildUser.Id))
+            return Success.Empty;
 
-        if (allowedRoles == null)
+        var allowedRoleIds = dbContext.RaffleSettings
+            .AsNoTracking()
+            .Include(rs => rs.AllowedRoles)
+            .FirstOrDefault(rs => rs.Guild.Id == context.Guild.Id)
+            ?.AllowedRoles
+            .Select(ar => ar.Id)
+            .ToArray();
+
+        if (allowedRoleIds == null)
             return new Error("Не настроены роли для пользователей");
 
         var roles = guildUser.GetRoles(context.Guild);
         foreach (var role in roles)
         {
-            if (allowedRoles.Contains(role.Id))
+            if (allowedRoleIds.Contains(role.Id))
                 return Success.Empty;
         }
 

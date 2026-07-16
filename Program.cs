@@ -5,7 +5,12 @@ using dotenv.net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using NetCord;
 using NetCord.Hosting.Gateway;
+using NetCord.Hosting.Services;
+using NetCord.Hosting.Services.ApplicationCommands;
+using NetCord.Hosting.Services.ComponentInteractions;
+using NetCord.Services.ComponentInteractions;
 using Scalar.AspNetCore;
 using System.Text;
 
@@ -36,8 +41,17 @@ builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
 
 //Add dicord bot gateway
 builder.Services.AddDiscordGateway(opt =>
-    opt.Token = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN")
-);
+{
+    opt.Token = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
+});
+
+builder.Services
+    .AddApplicationCommands()
+    .AddComponentInteractions<ButtonInteraction, ButtonInteractionContext>()
+    .AddComponentInteractions<StringMenuInteraction, StringMenuInteractionContext>()
+    .AddComponentInteractions<UserMenuInteraction, UserMenuInteractionContext>()
+    .AddComponentInteractions<ChannelMenuInteraction, ChannelMenuInteractionContext>()
+    .AddComponentInteractions<ModalInteraction, ModalInteractionContext>();
 
 builder.Services.AddSingleton<UpdateUsersService>();
 builder.Services.AddSingleton<PasswordHasher>();
@@ -80,5 +94,7 @@ app.MapControllers();
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.AddModules(typeof(Program).Assembly);
 
 await app.RunAsync();

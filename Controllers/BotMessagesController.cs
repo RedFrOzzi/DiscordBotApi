@@ -4,138 +4,138 @@ using Microsoft.AspNetCore.Mvc;
 using NetCord.Gateway;
 using NetCord.Rest;
 
-namespace DiscordBotApi.Controllers
+namespace DiscordBotApi.Controllers;
+
+[ApiController]
+[Route("/BotMessages")]
+[Authorize(Roles = "Admin")]
+public class BotMessagesController(GatewayClient client) : ControllerBase
 {
-    [ApiController]
-    [Route("/BotMessages")]
-    [Authorize(Roles = "Admin")]
-    public class BotMessagesController : ControllerBase
+    readonly GatewayClient _client = client;
+
+    //------------------------------------------------------SEND-MESSAGES-------------------------------------------------------------------------------------------------------------
+
+    [HttpPost("/send-props")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> SendMessage([FromQuery] ulong channelId, [FromBody] MessageProperties messageProps, CancellationToken cancellationToken)
     {
-        readonly GatewayClient _client;
-
-        public BotMessagesController(GatewayClient client)
+        if (_client == null)
         {
-            _client = client;
+            return BadRequest("Bot service is not working");
         }
 
-        //------------------------------------------------------SEND-MESSAGES-------------------------------------------------------------------------------------------------------------
+        await _client.Rest.SendMessageAsync(channelId, messageProps, cancellationToken: cancellationToken);
 
-        [HttpPost("/send-props")]
-        [ProducesResponseType(200)]
-        public async Task<IActionResult> SendMessage([FromQuery] ulong channelId, [FromBody] MessageProperties messageProps, CancellationToken cancellationToken)
+        return Ok();
+    }
+
+    [HttpPost("/send-message")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> SendMessage([FromQuery] ulong channelId, [FromBody] string message, CancellationToken cancellationToken)
+    {
+        if (_client == null)
         {
-            if (_client == null)
-            {
-                return BadRequest("Bot service is not working");
-            }
-
-            await _client.Rest.SendMessageAsync(channelId, messageProps, cancellationToken: cancellationToken);
-
-            return Ok();
+            return BadRequest("Bot service is not working");
         }
 
-        [HttpPost("/send-message")]
-        [ProducesResponseType(200)]
-        public async Task<IActionResult> SendMessage([FromQuery] ulong channelId, [FromBody] string message, CancellationToken cancellationToken)
+        await _client.Rest.SendMessageAsync(channelId, message, cancellationToken: cancellationToken);
+
+        return Ok();
+    }
+
+    [HttpPost("/send-embed")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> SendMessageWithEmbed([FromQuery] ulong channelId, [FromBody] SendEmbedDto embed, CancellationToken cancellationToken)
+    {
+        if (_client == null)
         {
-            if (_client == null)
-            {
-                return BadRequest("Bot service is not working");
-            }
-
-            await _client.Rest.SendMessageAsync(channelId, message, cancellationToken: cancellationToken);
-
-            return Ok();
+            return BadRequest("Bot service is not working");
         }
 
-        [HttpPost("/send-embed")]
-        [ProducesResponseType(200)]
-        public async Task<IActionResult> SendMessageWithEmbed([FromQuery] ulong channelId, [FromBody] SendEmbedDto embed, CancellationToken cancellationToken)
+        await _client.Rest.SendMessageAsync(channelId, new MessageProperties().AddEmbeds(embed.Convert()), cancellationToken: cancellationToken);
+
+        return Ok();
+    }
+
+    //------------------------------------------------------DELETE-MESSAGES-------------------------------------------------------------------------------------------------------------
+
+    [HttpDelete("/delete-bot-messages")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> DeleteBotMessages([FromQuery] ulong channelId, CancellationToken cancellationToken)
+    {
+        if (_client == null)
         {
-            if (_client == null)
-            {
-                return BadRequest("Bot service is not working");
-            }
-
-            await _client.Rest.SendMessageAsync(channelId, new MessageProperties().AddEmbeds(embed.Convert()), cancellationToken: cancellationToken);
-
-            return Ok();
+            return BadRequest("Bot service is not working");
         }
 
-        //------------------------------------------------------DELETE-MESSAGES-------------------------------------------------------------------------------------------------------------
+        var botMessages = await GetMessages(_client.Rest, channelId);
+        await _client.Rest.DeleteMessagesAsync(channelId, botMessages, cancellationToken: cancellationToken);
 
-        [HttpDelete("/delete-bot-messages")]
-        [ProducesResponseType(200)]
-        public async Task<IActionResult> DeleteBotMessages([FromQuery] ulong channelId, CancellationToken cancellationToken)
+        return Ok();
+    }
+
+    [HttpDelete("/delete-message")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> DeleteMessage([FromQuery] ulong channelId, [FromQuery] ulong massageId, CancellationToken cancellationToken)
+    {
+        if (_client == null)
         {
-            if (_client == null)
-            {
-                return BadRequest("Bot service is not working");
-            }
-
-            var botMessages = await GetMessages(_client.Rest, channelId);
-            await _client.Rest.DeleteMessagesAsync(channelId, botMessages, cancellationToken: cancellationToken);
-
-            return Ok();
+            return BadRequest("Bot service is not working");
         }
 
-        [HttpDelete("/delete-message")]
-        [ProducesResponseType(200)]
-        public async Task<IActionResult> DeleteMessage([FromQuery] ulong channelId, [FromQuery] ulong massageId, CancellationToken cancellationToken)
+        await _client.Rest.DeleteMessageAsync(channelId, massageId, cancellationToken: cancellationToken);
+
+        return Ok();
+    }
+
+    [HttpDelete("/delete-messages")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> DeleteMessages([FromQuery] ulong channelId, [FromQuery] ulong userId, CancellationToken cancellationToken)
+    {
+        if (_client == null)
         {
-            if (_client == null)
-            {
-                return BadRequest("Bot service is not working");
-            }
-
-            await _client.Rest.DeleteMessageAsync(channelId, massageId, cancellationToken: cancellationToken);
-
-            return Ok();
+            return BadRequest("Bot service is not working");
         }
 
-        [HttpDelete("/delete-messages")]
-        [ProducesResponseType(200)]
-        public async Task<IActionResult> DeleteMessages([FromQuery] ulong channelId, [FromQuery] ulong userId, CancellationToken cancellationToken)
+        var messageIds = await GetMessages(_client.Rest, channelId, userId);
+        await _client.Rest.DeleteMessagesAsync(channelId, messageIds, cancellationToken: cancellationToken);
+
+        return Ok();
+
+        static async Task<List<ulong>> GetMessages(RestClient client, ulong channelId, ulong userId)
         {
-            if (_client == null)
-            {
-                return BadRequest("Bot service is not working");
-            }
-
-            var messageIds = await GetMessages(_client.Rest, channelId, userId);
-            await _client.Rest.DeleteMessagesAsync(channelId, messageIds, cancellationToken: cancellationToken);
-
-            return Ok();
-
-            static async Task<List<ulong>> GetMessages(RestClient client, ulong channelId, ulong userId)
-            {
-                List<ulong> ids = [];
-                await foreach (var msg in client.GetMessagesAsync(channelId))
-                {
-                    if (msg == null || msg.Author.Id != userId)
-                        continue;
-
-                    ids.Add(msg.Id);
-                }
-                return ids;
-            }
-        }
-
-
-
-
-        static async Task<List<ulong>> GetMessages(RestClient client, ulong channelId)
-        {
-            List<ulong> msgIds = [];
+            List<ulong> ids = [];
             await foreach (var msg in client.GetMessagesAsync(channelId))
             {
-                if (msg == null || !msg.Author.IsBot)
+                if (msg == null || msg.Author.Id != userId)
                     continue;
 
-                msgIds.Add(msg.Id);
+                ids.Add(msg.Id);
             }
-
-            return msgIds;
+            return ids;
         }
+    }
+
+
+
+
+    static async Task<List<ulong>> GetMessages(RestClient client, ulong channelId)
+    {
+        List<ulong> msgIds = [];
+        await foreach (var msg in client.GetMessagesAsync(channelId))
+        {
+            if (msg == null || !msg.Author.IsBot)
+                continue;
+
+            msgIds.Add(msg.Id);
+        }
+
+        return msgIds;
     }
 }
