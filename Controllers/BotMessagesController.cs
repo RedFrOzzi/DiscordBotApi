@@ -7,8 +7,8 @@ using NetCord.Rest;
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
-[Route("/BotMessages")]
-[Authorize(Roles = "Admin")]
+[Route("[controller]")]
+[Authorize(Roles = "Admin, Moderator")]
 public class BotMessagesController(GatewayClient client) : ControllerBase
 {
     readonly GatewayClient _client = client;
@@ -18,14 +18,18 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
     [HttpPost("/send-props")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
-    public async Task<IActionResult> SendMessage([FromQuery] ulong channelId, [FromBody] MessageProperties messageProps, CancellationToken cancellationToken)
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> SendMessage([FromQuery] ulong channelId, [FromBody] SendMessageDto message, CancellationToken cancellationToken)
     {
-        if (_client == null)
-        {
-            return BadRequest("Bot service is not working");
-        }
+        if (channelId == default || message == null)
+            return BadRequest("Parameters error");
 
-        await _client.Rest.SendMessageAsync(channelId, messageProps, cancellationToken: cancellationToken);
+        if (_client == null)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
+        var mProps = message.ConvertoToMessageProperties();
+
+        await _client.Rest.SendMessageAsync(channelId, mProps, cancellationToken: cancellationToken);
 
         return Ok();
     }
@@ -33,12 +37,14 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
     [HttpPost("/send-message")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
     public async Task<IActionResult> SendMessage([FromQuery] ulong channelId, [FromBody] string message, CancellationToken cancellationToken)
     {
+        if (channelId == default || string.IsNullOrEmpty(message))
+            return BadRequest("Parameters error");
+
         if (_client == null)
-        {
-            return BadRequest("Bot service is not working");
-        }
+            return StatusCode(StatusCodes.Status500InternalServerError);
 
         await _client.Rest.SendMessageAsync(channelId, message, cancellationToken: cancellationToken);
 
@@ -48,14 +54,20 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
     [HttpPost("/send-embed")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
     public async Task<IActionResult> SendMessageWithEmbed([FromQuery] ulong channelId, [FromBody] SendEmbedDto embed, CancellationToken cancellationToken)
     {
-        if (_client == null)
-        {
-            return BadRequest("Bot service is not working");
-        }
+        if (channelId == default || embed == null)
+            return BadRequest("Parameters error");
 
-        await _client.Rest.SendMessageAsync(channelId, new MessageProperties().AddEmbeds(embed.Convert()), cancellationToken: cancellationToken);
+        if (_client == null)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
+        var dto = embed.ConvertToEmbedProperties();
+        MessageProperties mProps = new();
+        mProps.AddEmbeds(dto);
+
+        await _client.Rest.SendMessageAsync(channelId, mProps, cancellationToken: cancellationToken);
 
         return Ok();
     }
@@ -65,14 +77,16 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
     [HttpDelete("/delete-bot-messages")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
     public async Task<IActionResult> DeleteBotMessages([FromQuery] ulong channelId, CancellationToken cancellationToken)
     {
-        if (_client == null)
-        {
-            return BadRequest("Bot service is not working");
-        }
+        if (channelId == default)
+            return BadRequest("Parameters error");
 
-        var botMessages = await GetMessages(_client.Rest, channelId);
+        if (_client == null)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
+        var botMessages = await GetBotMessages(_client.Rest, channelId);
         await _client.Rest.DeleteMessagesAsync(channelId, botMessages, cancellationToken: cancellationToken);
 
         return Ok();
@@ -81,12 +95,14 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
     [HttpDelete("/delete-message")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
     public async Task<IActionResult> DeleteMessage([FromQuery] ulong channelId, [FromQuery] ulong massageId, CancellationToken cancellationToken)
     {
+        if (channelId == default || massageId == default)
+            return BadRequest("Parameters error");
+
         if (_client == null)
-        {
-            return BadRequest("Bot service is not working");
-        }
+            return StatusCode(StatusCodes.Status500InternalServerError);
 
         await _client.Rest.DeleteMessageAsync(channelId, massageId, cancellationToken: cancellationToken);
 
@@ -96,36 +112,36 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
     [HttpDelete("/delete-messages")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
     public async Task<IActionResult> DeleteMessages([FromQuery] ulong channelId, [FromQuery] ulong userId, CancellationToken cancellationToken)
     {
-        if (_client == null)
-        {
-            return BadRequest("Bot service is not working");
-        }
+        if (channelId == default || userId == default)
+            return BadRequest("Parameters error");
 
-        var messageIds = await GetMessages(_client.Rest, channelId, userId);
+        if (_client == null)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
+        var messageIds = await GetUserMessages(_client.Rest, channelId, userId);
         await _client.Rest.DeleteMessagesAsync(channelId, messageIds, cancellationToken: cancellationToken);
 
         return Ok();
-
-        static async Task<List<ulong>> GetMessages(RestClient client, ulong channelId, ulong userId)
-        {
-            List<ulong> ids = [];
-            await foreach (var msg in client.GetMessagesAsync(channelId))
-            {
-                if (msg == null || msg.Author.Id != userId)
-                    continue;
-
-                ids.Add(msg.Id);
-            }
-            return ids;
-        }
     }
 
 
+    static async Task<List<ulong>> GetUserMessages(RestClient client, ulong channelId, ulong userId)
+    {
+        List<ulong> ids = [];
+        await foreach (var msg in client.GetMessagesAsync(channelId))
+        {
+            if (msg == null || msg.Author.Id != userId)
+                continue;
 
+            ids.Add(msg.Id);
+        }
+        return ids;
+    }
 
-    static async Task<List<ulong>> GetMessages(RestClient client, ulong channelId)
+    static async Task<List<ulong>> GetBotMessages(RestClient client, ulong channelId)
     {
         List<ulong> msgIds = [];
         await foreach (var msg in client.GetMessagesAsync(channelId))

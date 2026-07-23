@@ -4,11 +4,15 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 Migrations/
+DataStorage/
 ApplicationData.db
 ApplicationData.db-shm
 ApplicationData.db-wal
 bot_logs.log
 secrets.json
+libopus
+libdave
+opus
 
 .env
 
@@ -370,3 +374,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/libdave.dll
+/opus.dll

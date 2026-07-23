@@ -1,14 +1,14 @@
 ﻿using DiscordBotApi.Data.Raffles;
 using DiscordBotApi.Database;
 
-namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService
+namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService;
+
+public static class RaffleUtils
 {
-    public static class RaffleUtils
+    public static void TryCloseRaffleOnMessageDeletion(ApplicationDbContext dbContext, ulong messageIs)
     {
-        public static void CloseRaffle(IServiceProvider provider, ulong messageIs)
+        try
         {
-            using var scope = provider.CreateScope();
-            var dbContext = scope.ServiceProvider.GetService<ApplicationDbContext>();
             if (dbContext == null)
                 return;
 
@@ -18,12 +18,16 @@ namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService
 
             raffle.IsClosed = true;
 
-            var userBets = dbContext.UserBets.Where(ub => ub.Raffle.Id == raffle.Id).Select(ub => new UserBet
-            {
-                Id = ub.Id,
-                User = ub.User,
-                BetAmount = ub.BetAmount,
-            }).ToArray();
+            var userBets = dbContext.UserBets
+                .Where(ub => ub.Raffle.Id == raffle.Id)
+                .Select(ub => new UserBet
+                {
+                    Id = ub.Id,
+                    User = ub.User,
+                    BetAmount = ub.BetAmount,
+                })
+                .ToArray();
+
             if (userBets.Length == 0)
             {
                 dbContext.SaveChanges();
@@ -37,5 +41,6 @@ namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService
 
             dbContext.SaveChanges();
         }
+        catch { }
     }
 }

@@ -10,7 +10,7 @@ namespace DiscordBotApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin, Moderator")]
 public class DiscordChannelsController(ApplicationDbContext context, GatewayClient client) : ControllerBase
 {
     readonly ApplicationDbContext _context = context;

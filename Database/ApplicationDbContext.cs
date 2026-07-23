@@ -1,9 +1,11 @@
 ﻿using DiscordBotApi.Data.ApiUsers;
+using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Data.Channels;
 using DiscordBotApi.Data.DiscordUsers;
 using DiscordBotApi.Data.Guilds;
 using DiscordBotApi.Data.Raffles;
 using DiscordBotApi.Data.Roles;
+using DiscordBotApi.Data.Settings;
 using Microsoft.EntityFrameworkCore;
 
 namespace DiscordBotApi.Database;
@@ -17,9 +19,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<DiscordUser> DiscordUsers { get; set; }
 
     //Raffle
-    public DbSet<RaffleSettings> RaffleSettings { get; set; }
+    public DbSet<Settings> Settings { get; set; }
     public DbSet<Raffle> Rafles { get; set; }
     public DbSet<UserBet> UserBets { get; set; }
+    public DbSet<AudioTrack> AudioTracks { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

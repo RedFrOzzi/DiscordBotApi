@@ -2,11 +2,11 @@
 using DiscordBotApi.Data.Roles;
 using System.ComponentModel.DataAnnotations;
 
-namespace DiscordBotApi.Data.Raffles;
+namespace DiscordBotApi.Data.Settings;
 
-public class RaffleSettings
+public class Settings
 {
-    [Key] public int Id { get; set; }
+    [Key] public int Key { get; set; }
     [Required] public DiscordGuild Guild { get; set; } = null!;
-    public ICollection<DiscordGuildRole> AllowedRoles { get; set; } = [];
+    public ICollection<DiscordGuildRole>? PrivilegedRoles { get; set; }
 }

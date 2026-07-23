@@ -7,17 +7,11 @@ using NetCord.Services.ComponentInteractions;
 
 namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService;
 
-public class RaffleModalInteractionModule : ComponentInteractionModule<ModalInteractionContext>
+public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : ComponentInteractionModule<ModalInteractionContext>
 {
-    private readonly ApplicationDbContext _dbContext;
-
-    public RaffleModalInteractionModule(ApplicationDbContext dbContext) 
-    {
-        _dbContext = dbContext;
-    }
+    readonly ApplicationDbContext _dbContext = dbContext;
 
     //Respond to game creation command
-
     [ComponentInteraction(RaffleConstants.RaffleInitialModalId)]
     public async Task RespondToRaffleModal()
     {

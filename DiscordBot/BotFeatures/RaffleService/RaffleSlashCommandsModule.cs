@@ -5,147 +5,20 @@ using DiscordBotApi.Utilities.Result;
 using Microsoft.EntityFrameworkCore;
 using NetCord;
 using NetCord.Rest;
-using NetCord.Services;
 using NetCord.Services.ApplicationCommands;
 
 namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService;
 
 [SlashCommand("игра", "Игра со ставками")]
-public class RaffleSlashCommandsModule : ApplicationCommandModule<ApplicationCommandContext>
+public class RaffleSlashCommandsModule(ApplicationDbContext dbContext) 
+    : ApplicationCommandModule<ApplicationCommandContext>
 {
-    readonly ApplicationDbContext _dbContext;
-    readonly RaffleAllowedUsersService _raffleAllowedUsersService;
-
-    public RaffleSlashCommandsModule(ApplicationDbContext dbContext, RaffleAllowedUsersService raffleAllowedUsersService)
-    {
-        _dbContext = dbContext;
-        _raffleAllowedUsersService = raffleAllowedUsersService;
-    }
-
-    [SubSlashCommand("добавить_роль", "Добавить роль, которая имеет право создавать игры")]
-    public async Task AddRoleToRaffleSettings(Role role)
-    {
-        var result = await _raffleAllowedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext);
-        if (result is Error)
-        {
-            InteractionMessageProperties imsgp = new()
-            {
-                Content = result.Message,
-                Flags = MessageFlags.Ephemeral
-            };
-            var errorMsg = InteractionCallback.Message(imsgp);
-
-            await RespondAsync(errorMsg);
-            return;
-        }
-
-        if (role == null)
-        {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Введенные данные не верны",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
-            return;
-        }
-
-        if (Context.Guild == null)
-        {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Внутренняя ошибка",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
-            return;
-        }
-
-        if (CreateRaffleSettingsOrAddRole(_dbContext, Context.Guild.Id, role.Id))
-        {
-            InteractionMessageProperties imsgp = new()
-            {
-                Content = "Настройки сохранены",
-                Flags = MessageFlags.Ephemeral
-            };
-            var errorMsg = InteractionCallback.Message(imsgp);
-
-            await RespondAsync(errorMsg);
-            return;
-        }
-
-        InteractionMessageProperties errorMsgProps2 = new()
-        {
-            Content = "Ошибка сохранения настроек",
-            Flags = MessageFlags.Ephemeral
-        };
-        await RespondAsync(InteractionCallback.Message(errorMsgProps2));
-    }
-
-    [SubSlashCommand("убрать_роль", "Убрать роль, которая имеет право создавать игры")]
-    public async Task RemoveRoleToRaffleSettings(Role role)
-    {
-        var result = await _raffleAllowedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext);
-        if (result is Error)
-        {
-            InteractionMessageProperties imsgp = new()
-            {
-                Content = result.Message,
-                Flags = MessageFlags.Ephemeral
-            };
-            var errorMsg = InteractionCallback.Message(imsgp);
-
-            await RespondAsync(errorMsg);
-            return;
-        }
-
-        if (role == null)
-        {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Введенные данные не верны",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
-            return;
-        }
-
-        if (Context.Guild == null)
-        {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Внутренняя ошибка",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
-            return;
-        }
-
-        if (RemoveRoleFromRaffleSettings(_dbContext, Context.Guild.Id, role.Id))
-        {
-            InteractionMessageProperties imsgp = new()
-            {
-                Content = "Настройки сохранены",
-                Flags = MessageFlags.Ephemeral
-            };
-            var errorMsg = InteractionCallback.Message(imsgp);
-
-            await RespondAsync(errorMsg);
-            return;
-        }
-
-        InteractionMessageProperties errorMsgProps2 = new()
-        {
-            Content = "Ошибка сохранения настроек",
-            Flags = MessageFlags.Ephemeral
-        };
-        await RespondAsync(InteractionCallback.Message(errorMsgProps2));
-    }
+    readonly ApplicationDbContext _dbContext = dbContext;
 
     [SubSlashCommand("создать", "Создать вопрос для игры")]
     public async Task CreateRaffleModal()
     {
-        var result = await _raffleAllowedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext);
+        var result = await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext);
         if (result is Error)
         {
             InteractionMessageProperties imsgp = new()
@@ -221,7 +94,7 @@ public class RaffleSlashCommandsModule : ApplicationCommandModule<ApplicationCom
             })
             .ToArray();
 
-        if (userBets == null || userBets.Length > 0)
+        if (userBets == null || userBets.Length == 0)
         {
             await ModifyResponseAsync(m => m.Content = "Нет статистики по ставкам");
             return;
@@ -275,62 +148,5 @@ public class RaffleSlashCommandsModule : ApplicationCommandModule<ApplicationCom
         {
             m.Embeds = [embedProps];
         });
-    }
-
-
-    private static bool CreateRaffleSettingsOrAddRole(ApplicationDbContext ctx, ulong guildId, ulong roleId)
-    {
-        var guild = ctx.Guilds.FirstOrDefault(g => g.Id == guildId);
-        if (guild == null)
-            return false;
-
-        var role = ctx.DiscordGuildRoles.FirstOrDefault(r => r.Id == roleId);
-        if (role == null)
-            return false;
-
-        var dbRaffleSettings = ctx.RaffleSettings
-            .Include(r => r.AllowedRoles)
-            .FirstOrDefault(rs => rs.Guild.Id == guildId);
-
-        //Create new entity if empty
-        if (dbRaffleSettings == null)
-        {
-            var raffleSettings = new RaffleSettings()
-            {
-                Guild = guild,
-                AllowedRoles = [role]
-            };
-
-            ctx.RaffleSettings.Add(raffleSettings);
-            return ctx.SaveChanges() > 0;
-        }
-
-        //Add role if exist
-        dbRaffleSettings.AllowedRoles.Add(role);
-        return ctx.SaveChanges() > 0;
-    }
-
-    private static bool RemoveRoleFromRaffleSettings(ApplicationDbContext ctx, ulong guildId, ulong roleId)
-    {
-        var guild = ctx.Guilds.FirstOrDefault(g => g.Id == guildId);
-        if (guild == null)
-            return false;
-
-        var role = ctx.DiscordGuildRoles.FirstOrDefault(r => r.Id == roleId);
-        if (role == null)
-            return false;
-
-        var dbRaffleSettings = ctx.RaffleSettings
-            .Include(r => r.AllowedRoles)
-            .FirstOrDefault(rs => rs.Guild.Id == guildId);
-
-        if (dbRaffleSettings == null)
-            return false;
-
-        //returns false if role was not found in collection
-        if (!dbRaffleSettings.AllowedRoles.Remove(role))
-            return false;
-
-        return ctx.SaveChanges() > 0;
     }
 }

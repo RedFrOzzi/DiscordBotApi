@@ -1,4 +1,4 @@
-﻿namespace DiscordBotApi.Data.ApiUsers.Dtos
+﻿namespace DiscordBotApi.Data.ApiUsers
 {
     public class ApiUserLoginDto
     {

@@ -1,7 +1,7 @@
 ﻿using DiscordBotApi.Data.VoiceStates;
 using NetCord.Gateway;
 
-namespace DiscordBotApi.Data.DiscordUsers.Dtos
+namespace DiscordBotApi.Data.DiscordUsers
 {
     public class DiscordUserGetDto
     {

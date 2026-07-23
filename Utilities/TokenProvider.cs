@@ -1,6 +1,5 @@
 ﻿using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using System.Text.Json;
 using System.Security.Claims;
 using Microsoft.IdentityModel.JsonWebTokens;
 using DiscordBotApi.Data.ApiUsers;
@@ -18,9 +17,10 @@ namespace DiscordBotApi.Utilities
 
             List<Claim> claims = [new Claim(JwtRegisteredClaimNames.Sub, apiUser.Id.ToString())];
             if (apiUser.IsAdmin)
-            {
                 claims.Add(new(ClaimTypes.Role, "Admin"));
-            }
+
+            if (apiUser.IsModerator)
+                claims.Add(new(ClaimTypes.Role, "Moderator"));
 
             var tokenDescriptor = new SecurityTokenDescriptor
             {

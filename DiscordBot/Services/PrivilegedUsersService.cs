@@ -7,9 +7,9 @@ using NetCord.Services;
 
 namespace DiscordBotApi.DiscordBot.Services;
 
-public class RaffleAllowedUsersService
+public class PrivilegedUsersService
 {
-    public async Task<Result> IsAuthorizedRoleOrOwner<TContext>(TContext context, ApplicationDbContext dbContext) where TContext : IUserContext, IGuildContext
+    public static async Task<Result> IsAuthorizedRoleOrOwner<TContext>(TContext context, ApplicationDbContext dbContext) where TContext : IUserContext, IGuildContext
     {
         var guildUser = context.User as GuildUser;
         if (guildUser == null || context.Guild == null)
@@ -22,12 +22,11 @@ public class RaffleAllowedUsersService
         if (adminIds != null && adminIds.Count > 0 && adminIds.Contains(guildUser.Id))
             return Success.Empty;
 
-        var allowedRoleIds = dbContext.RaffleSettings
+        var allowedRoleIds = dbContext.Settings
             .AsNoTracking()
-            .Include(rs => rs.AllowedRoles)
-            .FirstOrDefault(rs => rs.Guild.Id == context.Guild.Id)
-            ?.AllowedRoles
-            .Select(ar => ar.Id)
+            .Include(s => s.PrivilegedRoles)
+            .FirstOrDefault(rs => rs.Guild.Id == context.Guild.Id)?.PrivilegedRoles
+            ?.Select(gr => gr.Id)
             .ToArray();
 
         if (allowedRoleIds == null)

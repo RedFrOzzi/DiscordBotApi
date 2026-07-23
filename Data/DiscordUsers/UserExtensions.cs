@@ -1,5 +1,4 @@
-﻿using DiscordBotApi.Data.DiscordUsers.Dtos;
-using NetCord;
+﻿using NetCord;
 using NetCord.Rest;
 
 namespace DiscordBotApi.Data.DiscordUsers

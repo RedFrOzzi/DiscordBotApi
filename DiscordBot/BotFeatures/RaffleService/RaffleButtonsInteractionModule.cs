@@ -8,21 +8,15 @@ using NetCord.Services.ComponentInteractions;
 
 namespace DiscordBotApi.DiscordBot.BotFeatures.RaffleService;
 
-public class RaffleButtonsInteractionModule : ComponentInteractionModule<ButtonInteractionContext>
+public class RaffleButtonsInteractionModule(ApplicationDbContext dbContext) 
+    : ComponentInteractionModule<ButtonInteractionContext>
 {
-    private readonly ApplicationDbContext _dbContext;
-    private readonly RaffleAllowedUsersService _raffleAllowedUsersService;
-
-    public RaffleButtonsInteractionModule(ApplicationDbContext dbContext, RaffleAllowedUsersService raffleAllowedUsersService)
-    {
-        _dbContext = dbContext;
-        _raffleAllowedUsersService = raffleAllowedUsersService;
-    }
+    readonly ApplicationDbContext _dbContext = dbContext;
 
     [ComponentInteraction(RaffleConstants.ButtonEndRaffleId)]
     public async Task ButtonCloseRaffle(int raffleId)
     {
-        var result = await _raffleAllowedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext);
+        var result = await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext);
         if (result is Error)
         {
             InteractionMessageProperties imsgp = new()

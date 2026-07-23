@@ -1,48 +1,66 @@
-﻿using DiscordBotApi.Data.Channels;
+﻿using DiscordBotApi.Data.Guilds;
 using DiscordBotApi.Database;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NetCord;
+using Microsoft.EntityFrameworkCore;
 using NetCord.Gateway;
 
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin, Moderator")]
 public class DiscordGuildsController(ApplicationDbContext context, GatewayClient client) : ControllerBase
 {
     readonly ApplicationDbContext _context = context;
     readonly GatewayClient _client = client;
 
-    //[HttpPut("/guild/save-data")]
-    //[ProducesResponseType(201)]
-    //[ProducesResponseType(500)]
-    //public async Task<IActionResult> SaveDataToDatabase([FromQuery] ulong guildId, CancellationToken cancellationToken)
-    //{
-    //    if (_client == null)
-    //    {
-    //        return BadRequest("Bot service is not working");
-    //    }
+    [HttpGet("/guilds/get-guilds")]
+    [ProducesResponseType<List<DiscordGuildGetDto>>(200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetGuilds()
+    {
+        var guilds = _context.Guilds
+            .AsNoTracking()
+            .Select(g => new DiscordGuildGetDto()
+            {
+                Id = g.Id.ToString(),
+                Name = g.Name,
+                OwnerId = g.Owner.Id.ToString(),
+                UserIds = g.Users.Select(u => u.Id.ToString()).ToArray(),
+                ChannelIds = g.Channels.Select(c => c.Id.ToString()).ToArray(),
+            })
+            .AsSplitQuery()
+            .ToList();
 
-    //    if (_context.IsGuildExistInDb(guildId, out _))
-    //    {
-    //        return BadRequest("Guild already exist in the database");
-    //    }
+        if (guilds == null || guilds.Count == 0)
+            return NotFound();
 
-    //    List<DiscordUser> allUsers = await _context.GetUsers(cancellationToken);
-    //    List<GuildUser> guildUsers = [];
-    //    var guild = await _client.Rest.GetGuildAsync(guildId, cancellationToken: cancellationToken);
-    //    await foreach (var u in _client.Rest.GetGuildUsersAsync(guildId))
-    //    {
-    //        guildUsers.Add(u);
-    //    }
+        return Ok(guilds);
+    }
 
-    //    if (_context.SaveOrUpdateGuildAndUsers(guild, allUsers, guildUsers) != null)
-    //    {
-    //        return Created();
-    //    }
+    [HttpGet("/guilds/get-guild")]
+    [ProducesResponseType<DiscordGuildGetDto>(200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetGuild([FromQuery] ulong guildId)
+    {
+        var guild = _context.Guilds
+            .AsNoTracking()
+            .Where(g => g.Id == guildId)
+            .Select(g => new DiscordGuildGetDto()
+                {
+                    Id = g.Id.ToString(),
+                    Name = g.Name,
+                    OwnerId = g.Owner.Id.ToString(),
+                    UserIds = g.Users.Select(u => u.Id.ToString()).ToArray(),
+                    ChannelIds = g.Channels.Select(c => c.Id.ToString()).ToArray(),
+                })
+            .AsSplitQuery()
+            .FirstOrDefault();
 
-    //    return Problem(statusCode: 500, title: "Not saved", detail: "Database error");
-    //}
+        if (guild == null)
+            return NotFound();
+
+        return Ok(guild);
+    }
 }

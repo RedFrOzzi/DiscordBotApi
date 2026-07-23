@@ -2,141 +2,136 @@
 using DiscordBotApi.Database;
 using Microsoft.EntityFrameworkCore;
 using NetCord.Gateway;
+using Serilog;
 
-namespace DiscordBotApi.DiscordBot.Services
+namespace DiscordBotApi.DiscordBot.Services;
+
+public class UpdateUsersService(GatewayClient gateway, IServiceScopeFactory factory)
 {
-    public class UpdateUsersService
+    public bool IsInUpdateState => _isInUpdateState;
+    public int ProcessedPercent => _procecssed;
+
+    readonly GatewayClient _gateway = gateway;
+    readonly IServiceScopeFactory _factory = factory;
+    readonly SemaphoreSlim _updateLock = new(1, 1);
+    CancellationTokenSource? _cts;
+
+    bool _isInUpdateState = false;
+    int _procecssed;
+
+    /// <summary>
+    /// Updates user properties
+    /// </summary>
+    /// <param name="guildId">Guild in which users are updated</param>
+    public void BeginUpdate(ulong guildId)
     {
-        public bool IsInUpdateState => _isInUpdateState;
-        public int ProcessedPercent => _procecssed;
+        Task.Run(() => ExecuteUpdateAsync(guildId));
+    }
 
-        private readonly IServiceScopeFactory _serviceFactory;
-        private readonly SemaphoreSlim _updateLock = new(1, 1);
-        private CancellationTokenSource? _cts;
+    public void CancelUpdate()
+    {
+        _cts?.Cancel();
+        _isInUpdateState = false;
+    }
 
-        bool _isInUpdateState;
-        int _procecssed;
-
-        public UpdateUsersService(IServiceScopeFactory serviceFactory)
+    private async Task ExecuteUpdateAsync(ulong guildId)
+    {
+        if (!await _updateLock.WaitAsync(0))
         {
-            _serviceFactory = serviceFactory;
-            _isInUpdateState = false;
+            Log.Information("Users updater: Update already in progress. Ignoring new request.");
+            return;
         }
 
-        /// <summary>
-        /// Updates user properties
-        /// </summary>
-        /// <param name="guildId">Guild in which users are updated</param>
-        public void BeginUpdate(ulong guildId)
-        {
-            Task.Run(() => ExecuteUpdateAsync(guildId));
-        }
+        using var cts = new CancellationTokenSource();
+        _cts = cts;
+        var cancelationToken = cts.Token;
 
-        public void CancelUpdate()
+        try
         {
-            _cts?.Cancel();
-            _isInUpdateState = false;
-        }
+            _isInUpdateState = true;
+            Log.Information("Started background update job for guild {guildId}.", guildId);
 
-        private async Task ExecuteUpdateAsync(ulong guildId)
-        {
-            if (!await _updateLock.WaitAsync(0))
+            var guild = await _gateway.Rest.GetGuildAsync(guildId).ConfigureAwait(false);
+            if (guild == null)
             {
-                Console.WriteLine("Update already in progress. Ignoring new request.");
+                Log.Information("Guild {guildId} not found.", guildId);
                 return;
             }
 
-            using var cts = new CancellationTokenSource();
-            _cts = cts;
-            var cancelationToken = cts.Token;
-
-            try
+            var guildUsers = await _gateway.Rest.GetGuildUsersAsync(guild.Id).ToListAsync(cancelationToken);
+            if (guildUsers == null || guildUsers.Count == 0)
             {
-                _isInUpdateState = true;
-                Console.WriteLine($"Started background update job for guild {guildId}.");
+                Log.Information("No users found in guild {guildId}.", guildId);
+                return;
+            }
 
-                using var scope = _serviceFactory.CreateScope();
-                var client = scope.ServiceProvider.GetRequiredService<GatewayClient>();
-                var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var userIds = guildUsers.Select(u => u.Id).ToList();
 
-                var guild = await client.Rest.GetGuildAsync(guildId).ConfigureAwait(false);
-                if (guild == null)
+            using var scope = _factory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var dbUsersDict = await dbContext.DiscordUsers
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, cancelationToken);
+
+            var usersToUpdate = new List<DiscordUser>();
+
+            int processed = 0;
+            int total = guildUsers.Count;
+
+            foreach (var discordUser in guildUsers)
+            {
+                cancelationToken.ThrowIfCancellationRequested();
+
+                // Skip users not present in the database.
+                if (!dbUsersDict.TryGetValue(discordUser.Id, out var dbUser))
                 {
-                    Console.WriteLine($"Guild {guildId} not found.");
-                    return;
-                }
-
-                var guildUsers = await client.Rest.GetGuildUsersAsync(guild.Id).ToListAsync(cancelationToken).ConfigureAwait(false);
-                if (guildUsers == null || guildUsers.Count == 0)
-                {
-                   Console.WriteLine($"No users found in guild {guildId}.");
-                    return;
-                }
-
-                var userIds = guildUsers.Select(u => u.Id).ToList();
-                var dbUsersDict = await dbContext.DiscordUsers
-                    .Where(u => userIds.Contains(u.Id))
-                    .ToDictionaryAsync(u => u.Id, cancelationToken)
-                    .ConfigureAwait(false);
-
-                var usersToUpdate = new List<DiscordUser>();
-
-                int processed = 0;
-                int total = guildUsers.Count;
-
-                foreach (var discordUser in guildUsers)
-                {
-                    cancelationToken.ThrowIfCancellationRequested();
-
-                    // Skip users not present in the database.
-                    if (!dbUsersDict.TryGetValue(discordUser.Id, out var dbUser))
-                    {
-                        processed++;
-                        Console.WriteLine($"User {discordUser.Id} not in DB, skipping.");
-                        continue;
-                    }
-
-                    // Update properties.
-                    var imgUrl = discordUser.GetAvatarUrl();
-                    dbUser.ImageURL = imgUrl?.ToString();
-
-                    usersToUpdate.Add(dbUser);
                     processed++;
-
-                    // Log progress periodically.
-                    if (processed % 10 == 0 || processed == total)
-                    {
-                       Console.WriteLine($"Users to update left: {total - processed}");
-                        _procecssed = processed;
-                    }
-
-                    await Task.Delay(3000, cancelationToken).ConfigureAwait(false);
+                    Log.Information("User {discordUser.Id} not in DB, skipping.", discordUser.Id);
+                    continue;
                 }
 
-                // Apply all updates in a single batch.
-                if (usersToUpdate.Count > 0)
+                // Update properties.
+                var imgUrl = discordUser.GetAvatarUrl();
+                dbUser.ImageURL = imgUrl?.ToString();
+
+                usersToUpdate.Add(dbUser);
+                processed++;
+
+                // Log progress periodically.
+                if (processed % 10 == 0 || processed == total)
                 {
-                    dbContext.DiscordUsers.UpdateRange(usersToUpdate);
-                    await dbContext.SaveChangesAsync(cancelationToken).ConfigureAwait(false);
-                   Console.WriteLine($"Updated {usersToUpdate.Count} users in guild {guildId}.");
+                    var val = total - processed;
+                    Log.Information("Users to update left: {val}", val);
+                    _procecssed = processed;
                 }
 
-               Console.WriteLine($"Background update job finished for guild {guildId}.");
+                await Task.Delay(3000, cancelationToken);
             }
-            catch (OperationCanceledException)
+
+            // Apply all updates in a single batch.
+            if (usersToUpdate.Count > 0)
             {
-               Console.WriteLine("Background update job was canceled.");
+                dbContext.DiscordUsers.UpdateRange(usersToUpdate);
+                await dbContext.SaveChangesAsync(cancelationToken);
+               Log.Information("Updated {usersToUpdate.Count} users in guild {guildId}.", usersToUpdate.Count, guildId);
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"{ex.Message} Error during user update for guild {guildId}.");
-            }
-            finally
-            {
-                _isInUpdateState = false;
-                _cts = null;
-                _updateLock.Release();
-            }
+
+           Log.Information("Background update job finished for guild {guildId}.", guildId);
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Information("Background update job was canceled.");
+        }
+        catch (Exception ex)
+        {
+            Log.Information("{ex.Message} Error during user update for guild {guildId}.", ex.Message, guildId);
+        }
+        finally
+        {
+            _isInUpdateState = false;
+            _cts = null;
+            _updateLock.Release();
         }
     }
 }

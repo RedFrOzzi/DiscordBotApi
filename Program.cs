@@ -1,8 +1,10 @@
 using DiscordBotApi.Database;
+using DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Utilities;
 using dotenv.net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NetCord;
@@ -12,89 +14,125 @@ using NetCord.Hosting.Services.ApplicationCommands;
 using NetCord.Hosting.Services.ComponentInteractions;
 using NetCord.Services.ComponentInteractions;
 using Scalar.AspNetCore;
+using Serilog;
+using System.Net;
 using System.Text;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-DotEnv.Load();
-builder.Configuration.AddEnvironmentVariables();
-var securityKey =  Environment.GetEnvironmentVariable("SECURITY_KEY") ?? throw new("Security key was null");
-
-builder.Services.AddCors(options =>
+try
 {
-    options.AddDefaultPolicy(policy =>
+    Log.Information("Запуск приложения");
+
+    var builder = WebApplication.CreateBuilder(args);
+
+    builder.Host.UseSerilog((context, services, configuration) => configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext());
+
+    DotEnv.Load();
+    builder.Configuration.AddEnvironmentVariables();
+    var securityKey = Environment.GetEnvironmentVariable("SECURITY_KEY") ?? throw new("Security key was null");
+
+    builder.Services.AddCors(options =>
     {
-        policy.AllowAnyOrigin()
-        .AllowAnyHeader()
-        .AllowAnyMethod();
-    });
-});
-
-builder.Services.AddControllers();
-builder.Services.AddOpenApi(options => 
-{
-    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
-});
-
-builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
-
-//Add dicord bot gateway
-builder.Services.AddDiscordGateway(opt =>
-{
-    opt.Token = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
-});
-
-builder.Services
-    .AddApplicationCommands()
-    .AddComponentInteractions<ButtonInteraction, ButtonInteractionContext>()
-    .AddComponentInteractions<StringMenuInteraction, StringMenuInteractionContext>()
-    .AddComponentInteractions<UserMenuInteraction, UserMenuInteractionContext>()
-    .AddComponentInteractions<ChannelMenuInteraction, ChannelMenuInteractionContext>()
-    .AddComponentInteractions<ModalInteraction, ModalInteractionContext>();
-
-builder.Services.AddSingleton<UpdateUsersService>();
-builder.Services.AddSingleton<PasswordHasher>();
-builder.Services.AddSingleton<TokenProvider>();
-builder.Services.AddSingleton<RaffleAllowedUsersService>();
-
-//builder.Services.Configure<ForwardedHeadersOptions>(options =>
-//{
-//    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
-//                              ForwardedHeaders.XForwardedProto;
-//    options.KnownProxies.Add(IPAddress.Parse("127.0.0.1"));
-//});
-
-builder.Services.AddAuthorization();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(o =>
-    {
-        o.RequireHttpsMetadata = false;
-        o.TokenValidationParameters = new TokenValidationParameters
+        options.AddDefaultPolicy(policy =>
         {
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(securityKey)),
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
-            ClockSkew = TimeSpan.Zero,
-        };
+            policy.AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+        });
     });
 
-var app = builder.Build();
+    builder.Services.AddControllers();
+    builder.Services.AddOpenApi(options =>
+    {
+        options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    });
 
-app.MapOpenApi();
-app.MapScalarApiReference();
+    builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
+        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-app.UseForwardedHeaders();
+    builder.Services.AddHttpClient();
 
-app.UseRouting();
+    //Add dicord bot gateway
+    builder.Services.AddDiscordGateway(opt =>
+    {
+        opt.Token = Environment.GetEnvironmentVariable("DISCORD_BOT_TOKEN");
+        opt.Intents = NetCord.Gateway.GatewayIntents.All;
+    });
 
-app.UseCors();
+    builder.Services.AddGatewayHandlers(typeof(Program).Assembly);
 
-app.MapControllers();
+    builder.Services
+        .AddApplicationCommands()
+        .AddComponentInteractions<ButtonInteraction, ButtonInteractionContext>()
+        .AddComponentInteractions<StringMenuInteraction, StringMenuInteractionContext>()
+        .AddComponentInteractions<UserMenuInteraction, UserMenuInteractionContext>()
+        .AddComponentInteractions<ChannelMenuInteraction, ChannelMenuInteractionContext>()
+        .AddComponentInteractions<ModalInteraction, ModalInteractionContext>();
 
-app.UseAuthentication();
-app.UseAuthorization();
+    builder.Services.AddSingleton<UpdateUsersService>();
+    builder.Services.AddSingleton<PasswordHasher>();
+    builder.Services.AddSingleton<TokenProvider>();
+    builder.Services.AddSingleton<VoiceInstancesContainer>();
 
-app.AddModules(typeof(Program).Assembly);
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
+                                  ForwardedHeaders.XForwardedProto;
+        options.KnownProxies.Add(IPAddress.Parse("127.0.0.1"));
+    });
 
-await app.RunAsync();
+    builder.Services.AddAuthorization();
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(o =>
+        {
+            o.RequireHttpsMetadata = false;
+            o.TokenValidationParameters = new TokenValidationParameters
+            {
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(securityKey)),
+                ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                ValidAudience = builder.Configuration["Jwt:Audience"],
+                ClockSkew = TimeSpan.Zero,
+            };
+        });
+
+    var app = builder.Build();
+
+    app.UseSerilogRequestLogging();
+
+    app.MapOpenApi();
+    app.MapScalarApiReference();
+
+    app.UseForwardedHeaders();
+
+    app.UseRouting();
+
+    app.UseCors();
+
+    app.MapControllers();
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.AddModules(typeof(Program).Assembly);
+
+    await app.RunAsync();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Приложение завершилось неожиданно");
+    return 1;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
+
+return 0;
