@@ -4,11 +4,9 @@ using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Utilities.Result;
 using Microsoft.EntityFrameworkCore;
 using NetCord;
-using NetCord.Gateway;
 using NetCord.Gateway.Voice;
 using NetCord.Rest;
 using NetCord.Services.ApplicationCommands;
-using System.Net.Mail;
 
 namespace DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 
@@ -40,7 +38,75 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             return;
         }
 
-        await ConnectToVoiceChannel(guild, user);
+        ulong channelId;
+        if (guild.VoiceStates.TryGetValue(user.Id, out var voiceState))
+            channelId = voiceState.ChannelId.GetValueOrDefault();
+        else
+        {
+            await ModifyResponseAsync(m => m.Content = "Ты должен находиться в голосовм канале.");
+            return;
+        }
+
+        var guildId = guild.Id;
+
+        if (!_viContainer.VoiceInstances.TryAdd(guildId, null))
+        {
+            await ModifyResponseAsync(m => m.Content = "Бот уже находится в голосовом канале.");
+            return;
+        }
+
+        VoiceClient? voiceClient;
+        try
+        {
+            voiceClient = await Context.Client.JoinVoiceChannelAsync(guildId, channelId, new());
+        }
+        catch
+        {
+            _viContainer.VoiceInstances.TryRemove(item: new(guildId, null));
+
+            await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
+
+            throw;
+        }
+
+        VoiceInstance voiceInstance = new(voiceClient);
+
+        if (!_viContainer.VoiceInstances.TryUpdate(guildId, voiceInstance, null))
+        {
+            voiceInstance.Dispose();
+
+            await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
+
+            await ModifyResponseAsync(m => m.Content = "Не удалось зарегистрировать соединение.");
+            return;
+        }
+
+        voiceClient.Disconnect += args =>
+        {
+            if (args.Reconnect)
+                return default;
+
+            if (_viContainer.VoiceInstances.TryRemove(item: new(guildId, voiceInstance)))
+                voiceInstance.Dispose();
+
+            return default;
+        };
+
+        try
+        {
+            await voiceClient.StartAsync();
+        }
+        catch
+        {
+            if (_viContainer.VoiceInstances.TryRemove(item: new(guildId, voiceInstance)))
+            {
+                voiceInstance.Dispose();
+
+                await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
+            }
+
+            throw;
+        }
 
         await ModifyResponseAsync(m => m.Content = "Присоединился.");
     }
@@ -231,80 +297,5 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
         }
 
         await ModifyResponseAsync(m => m.Content = "Готово.");
-    }
-
-
-
-    private async Task ConnectToVoiceChannel(Guild guild, NetCord.User user)
-    {
-        ulong channelId;
-        if (guild.VoiceStates.TryGetValue(user.Id, out var voiceState))
-            channelId = voiceState.ChannelId.GetValueOrDefault();
-        else
-        {
-            await ModifyResponseAsync(m => m.Content = "Ты должен находиться в голосовм канале.");
-            return;
-        }
-
-        var guildId = guild.Id;
-
-        if (!_viContainer.VoiceInstances.TryAdd(guildId, null))
-        {
-            await ModifyResponseAsync(m => m.Content = "Бот уже находится в голосовом канале.");
-            return;
-        }
-
-        VoiceClient? voiceClient;
-        try
-        {
-            voiceClient = await Context.Client.JoinVoiceChannelAsync(guildId, channelId, new());
-        }
-        catch
-        {
-            _viContainer.VoiceInstances.TryRemove(item: new(guildId, null));
-
-            await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
-
-            throw;
-        }
-
-        VoiceInstance voiceInstance = new(voiceClient);
-
-        if (!_viContainer.VoiceInstances.TryUpdate(guildId, voiceInstance, null))
-        {
-            voiceInstance.Dispose();
-
-            await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
-
-            await ModifyResponseAsync(m => m.Content = "Не удалось зарегистрировать соединение.");
-            return;
-        }
-
-        voiceClient.Disconnect += args =>
-        {
-            if (args.Reconnect)
-                return default;
-
-            if (_viContainer.VoiceInstances.TryRemove(item: new(guildId, voiceInstance)))
-                voiceInstance.Dispose();
-
-            return default;
-        };
-
-        try
-        {
-            await voiceClient.StartAsync();
-        }
-        catch
-        {
-            if (_viContainer.VoiceInstances.TryRemove(item: new(guildId, voiceInstance)))
-            {
-                voiceInstance.Dispose();
-
-                await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
-            }
-
-            throw;
-        }
     }
 }
