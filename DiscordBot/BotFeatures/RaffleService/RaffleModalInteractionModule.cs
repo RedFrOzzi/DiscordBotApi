@@ -15,14 +15,11 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
     [ComponentInteraction(RaffleConstants.RaffleInitialModalId)]
     public async Task RespondToRaffleModal()
     {
+        await RespondAsync(InteractionCallback.DeferredModifyMessage);
+
         if (Context == null || Context.Components == null || Context.Components.Count == 0 || Context.Guild == null)
         {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Внутренняя ошибка",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
+            await FollowupAsync(new() { Content = "Внутренняя ошибка", Flags = MessageFlags.Ephemeral });
             return;
         }
 
@@ -30,12 +27,7 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
 
         if (guild == null)
         {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Канал не найден",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
+            await FollowupAsync(new() { Content = "Канал не найден", Flags = MessageFlags.Ephemeral });
             return;
         }
 
@@ -48,12 +40,7 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
 
         if (_dbContext.SaveChanges() == 0)
         {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Ошибка создания",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
+            await FollowupAsync(new() { Content = "Ошибка создания", Flags = MessageFlags.Ephemeral });
             return;
         }
 
@@ -158,30 +145,20 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
 
         props.Components = [actionRow];
         props.Embeds = [embedProps];
-        var message = await RespondAsync(InteractionCallback.Message(props), true);
+        var message = await FollowupAsync(props);
 
-        if (message == null || message.Resource == null || message.Resource.Message == null)
+        if (message == null || message.Id == 0)
         {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Ошибка создания",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
+            await FollowupAsync(new() { Content = "Ошибка создания", Flags = MessageFlags.Ephemeral });
             return;
         }
 
-        newRaffle.AnswerButtonsMessageId = message.Resource.Message.Id;
+        newRaffle.AnswerButtonsMessageId = message.Id;
         newRaffle.IsClosed = false;
 
         if (_dbContext.SaveChanges() == 0)
         {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Ошибка записи на диск",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
+            await FollowupAsync(new() { Content = "Ошибка записи на диск", Flags = MessageFlags.Ephemeral });
             return;
         }
     }
@@ -190,23 +167,72 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
     [ComponentInteraction(RaffleConstants.ModalCorrectAnswerSelectionId)]
     public async Task RespondToAnswerNumberSelection(int raffleId)
     {
-        int answerNum = -1;
-        foreach (var component in Context.Components)
-        {
-            if (component is not Label label || label.Component is not StringMenu menu || menu.SelectedValues?.Count < 1)
-            continue;
+        await RespondAsync(InteractionCallback.DeferredModifyMessage);
 
-            int.TryParse(menu.SelectedValues![0], out answerNum);
+        bool? deleteRaffle = Context.Components
+            ?.OfType<Label>()
+            ?.Select(l => l.Component)
+            ?.OfType<Checkbox>()
+            ?.FirstOrDefault()
+            ?.Checked;
+
+        if (deleteRaffle != null && deleteRaffle == true)
+        {
+            var r = _dbContext.Rafles
+            .FirstOrDefault(r => r.Id == raffleId);
+
+            if (r == null || r.IsClosed)
+            {
+                await FollowupAsync(new() { Content = "Эта игра уже закрыта или её нет", Flags = MessageFlags.Ephemeral });
+                return;
+            }
+
+            var bets = _dbContext.UserBets
+            .Where(ub => ub.Raffle.Id == r.Id)
+            .Select(ub => new UserBet
+            {
+                Id = ub.Id,
+                User = ub.User,
+                AnswerNumber = ub.AnswerNumber,
+                BetAmount = ub.BetAmount,
+                Raffle = ub.Raffle
+            });
+
+            foreach (var b in bets)
+            {
+                b.User.UserSpendingResource += b.BetAmount;
+            }
+
+            r.IsClosed = true;
+
+            _dbContext.SaveChanges();
+
+            //Delete message with buttons from discord
+            if (r.AnswerButtonsMessageId != 0)
+            {
+                await Context.Client.Rest.DeleteMessageAsync(Context.Channel.Id, r.AnswerButtonsMessageId);
+            }
+
+            await FollowupAsync(new() { Content = "Готово", Flags = MessageFlags.Ephemeral });
+            return;
+        }
+
+        var values = Context.Components
+            ?.OfType<Label>()
+            ?.Select(l => l.Component)
+            ?.OfType<StringMenu>()
+            ?.FirstOrDefault()
+            ?.SelectedValues;
+
+        int answerNum = -1;
+        if (values != null && values.Count > 0 && int.TryParse(values[0], out var res))
+        {
+            answerNum = res;
         }
 
         if (answerNum < 0)
         {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Ошибка",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
+            await FollowupAsync(new() { Content = "Ошибка выбора ответа", Flags = MessageFlags.Ephemeral });
             return;
         }
 
@@ -215,13 +241,7 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
 
         if (raffle == null || raffle.IsClosed)
         {
-            InteractionMessageProperties imsgp = new()
-            {
-                Content = "Эта игра уже закрыта или её нет",
-                Flags = MessageFlags.Ephemeral
-            };
-
-            await RespondAsync(InteractionCallback.Message(imsgp));
+            await FollowupAsync(new() { Content = "Эта игра уже закрыта или её нет", Flags = MessageFlags.Ephemeral });
             return;
         }
 
@@ -239,13 +259,7 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
 
         if (userBets.Length <= 1)
         {
-            InteractionMessageProperties imsgp = new()
-            {
-                Content = "Ошибка, в игре учавствует только один игрок",
-                Flags = MessageFlags.Ephemeral
-            };
-
-            await RespondAsync(InteractionCallback.Message(imsgp));
+            await FollowupAsync(new() { Content = "Ошибка, в игре учавствует только один игрок", Flags = MessageFlags.Ephemeral });
             return;
         }
 
@@ -270,13 +284,7 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
             await Context.Client.Rest.DeleteMessageAsync(Context.Channel.Id, raffle.AnswerButtonsMessageId);
         }
 
-        InteractionMessageProperties msgProps = new()
-        {
-            Content = "Готово",
-            Flags = MessageFlags.Ephemeral
-        };
-
-        await RespondAsync(InteractionCallback.Message(msgProps));
+        await FollowupAsync(new() { Content = "Готово", Flags = MessageFlags.Ephemeral });
         return;
     }
 
@@ -289,27 +297,16 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
         var raffle = _dbContext.Rafles.FirstOrDefault(r => r.Id == raffleId);
         if (Context == null || Context.Components == null || Context.Components.Count == 0 || raffle == null)
         {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Внутренняя ошибка",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
+            await FollowupAsync(new() { Content = "Внутренняя ошибка", Flags = MessageFlags.Ephemeral });
             return;
         }
 
         var user = _dbContext.DiscordUsers
-            .Include(u => u.UserSpendingResource)
             .FirstOrDefault(u => u.Id == Context.User.Id);
 
         if (user == null)
         {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = $"Тебя нет",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
+            await FollowupAsync(new() { Content = "Тебя нет в базе данных", Flags = MessageFlags.Ephemeral });
             return;
         }
 
@@ -318,14 +315,9 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
         {
             if (component is not Label label || label.Component is not TextInput input) { continue; }
 
-            if (!int.TryParse(input.Value, out bet) || bet < 0 || bet > maxUserBetAmount)
+            if (!int.TryParse(input.Value, out bet) || bet <= 0 || bet > maxUserBetAmount)
             {
-                InteractionMessageProperties errorMsgProps2 = new()
-                {
-                    Content = $"Ты чё чудишь!",
-                    Flags = MessageFlags.Ephemeral
-                };
-                await RespondAsync(InteractionCallback.Message(errorMsgProps2));
+                await FollowupAsync(new() { Content = "Ты чё чудишь!", Flags = MessageFlags.Ephemeral });
                 return;
             }
         }
@@ -345,12 +337,7 @@ public class RaffleModalInteractionModule(ApplicationDbContext dbContext) : Comp
 
         if (!isAdded)
         {
-            InteractionMessageProperties errorMsgProps = new()
-            {
-                Content = "Внутренняя ошибка",
-                Flags = MessageFlags.Ephemeral
-            };
-            await RespondAsync(InteractionCallback.Message(errorMsgProps));
+            await FollowupAsync(new() { Content = "Внутренняя ошибка", Flags = MessageFlags.Ephemeral });
             return;
         }
 

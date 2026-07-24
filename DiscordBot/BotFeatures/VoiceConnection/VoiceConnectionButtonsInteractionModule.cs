@@ -33,6 +33,17 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
 
         await RespondAsync(InteractionCallback.DeferredModifyMessage);
 
+        var track = _dbContext.AudioTracks
+           .AsNoTracking()
+           .Where(t => t.Guild.Id == guild.Id)
+           .FirstOrDefault(t => t.Title == title);
+
+        if (track == null)
+        {
+            Log.Error("User with id: {0} invoke audio play, but track with title: {1} was not found.", Context?.User?.Id, title);
+            return;
+        }
+
         //Connect to channel, if not already connected
         if (!_voiceInstancesContainer.VoiceInstances.ContainsKey(guild.Id))
         {
@@ -107,17 +118,6 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
 
                 throw;
             }
-        }
-
-        var track = _dbContext.AudioTracks
-            .AsNoTracking()
-            .Where(t => t.Guild.Id == guild.Id)
-            .FirstOrDefault(t => t.Title == title);
-
-        if (track == null)
-        {
-            Log.Error("User with id: {0} invoke audio play, but track with title: {1} was not found.", Context?.User?.Id, title);
-            return;
         }
 
         if (!_voiceInstancesContainer.VoiceInstances.TryGetValue(guild.Id, out var voiceInstance) || voiceInstance is null)

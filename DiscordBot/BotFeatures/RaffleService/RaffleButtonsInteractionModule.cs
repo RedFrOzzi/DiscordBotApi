@@ -72,10 +72,15 @@ public class RaffleButtonsInteractionModule(ApplicationDbContext dbContext)
             }
         }
 
-        ModalProperties mProps = new($"{RaffleConstants.ModalCorrectAnswerSelectionId}:{raffleId}", "Правильный ответ")
+        var checkbox = new CheckboxProperties("deleteraffletoggle")
         {
-            Components = [ new LabelProperties("Выбор", stringMenu) ]
+            Default = false
         };
+
+        ModalProperties mProps = new($"{RaffleConstants.ModalCorrectAnswerSelectionId}:{raffleId}", "Правильный ответ");
+        mProps.AddComponents(
+            new LabelProperties("Выбор", stringMenu),
+            new LabelProperties("Удалить текущую игру и вернуть ресурсы", checkbox));
 
         var callback = InteractionCallback.Modal(mProps);
         await RespondAsync(callback);
@@ -103,7 +108,7 @@ public class RaffleButtonsInteractionModule(ApplicationDbContext dbContext)
         {
             InteractionMessageProperties errorMsgProps = new()
             {
-                Content = "Тебя не существует или ты что-то сломал",
+                Content = "Тебя нет в базе данных",
                 Flags = MessageFlags.Ephemeral
             };
             await RespondAsync(InteractionCallback.Message(errorMsgProps));

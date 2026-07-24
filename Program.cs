@@ -1,6 +1,7 @@
 using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 using DiscordBotApi.DiscordBot.Services;
+using DiscordBotApi.Middlewares;
 using DiscordBotApi.Utilities;
 using dotenv.net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -55,6 +56,9 @@ try
         options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
     });
 
+    builder.Services.AddProblemDetails();
+    builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
     builder.Services.AddDbContextPool<ApplicationDbContext>(options =>
         options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -106,6 +110,8 @@ try
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
+
+    app.UseExceptionHandler();
 
     app.MapOpenApi();
     app.MapScalarApiReference();
