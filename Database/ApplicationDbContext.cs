@@ -1,4 +1,5 @@
 ﻿using DiscordBotApi.Data.ApiUsers;
+using DiscordBotApi.Data.AudioPanels;
 using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Data.Channels;
 using DiscordBotApi.Data.DiscordUsers;
@@ -22,7 +23,10 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Settings> Settings { get; set; }
     public DbSet<Raffle> Rafles { get; set; }
     public DbSet<UserBet> UserBets { get; set; }
+
+    //Audio
     public DbSet<AudioTrack> AudioTracks { get; set; }
+    public DbSet<AudioPanel> AudioPanels { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

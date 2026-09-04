@@ -1,7 +1,10 @@
 ﻿using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Database;
+using DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 using DiscordBotApi.Utilities.Result;
 using Microsoft.EntityFrameworkCore;
+using NetCord.Gateway;
+using NetCord.Rest;
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
@@ -10,37 +13,45 @@ namespace DiscordBotApi.DiscordBot.Services;
 public partial class AudioFilesService()
 {
     readonly static string _basePath = Path.Combine(AppContext.BaseDirectory, "DataStorage");
-    const long _maxLength = 15 * 1024 * 1024; //Size in bytes
+    const long _reservedFreeSpace = 536900000; //0.5 gb
+    const int _maxTitleLength = 79;
     static readonly ConcurrentDictionary<string, string> _titleToPathCollection = [];
 
     public static async Task<Result> TrySaveFile(ApplicationDbContext dbContext, IFormFile file, string title, ulong guildId)
     {
+        if (guildId <= 0)
+            return new BadRequesError("Не верно указан канал");
+
         if (file == null || file.Length == 0)
-            return new BadRequesError("Empty file.");
+            return new BadRequesError("Пустой файл");
 
-        if (file.Length > _maxLength)
-            return new BadRequesError("Large file.");
-
-        if (title.Length > 12 || !LettersAndNumbersRegex().IsMatch(title))
-            return new BadRequesError("Title should include only letters and numbers and be less then 10 characters.");
+        if (title.Length > _maxTitleLength || !LettersNumbersSymbolsRegex().IsMatch(title))
+            return new BadRequesError("Ошибка названия трека");
 
         if (!file.FileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase) 
             && file.ContentType != "audio/mpeg")
         {
-            return new BadRequesError("Only mp3 files are accepted.");
+            return new BadRequesError("Поддерживаются только файлы mp3");
         }
 
-        if (!Directory.Exists(_basePath))
-            Directory.CreateDirectory(_basePath);
+        var freeSpace = new DriveInfo(AppContext.BaseDirectory).AvailableFreeSpace;
+
+        if (freeSpace < _reservedFreeSpace)
+            return new BadRequesError("Не достаточно место на диске");
+
+        var directory = Path.Combine(_basePath, guildId.ToString());
+
+        if (!Directory.Exists(directory))
+            Directory.CreateDirectory(directory);
 
         if (dbContext.AudioTracks.Any(t => t.Title == title))
             return new AlreadyExistError();
 
         var guild = dbContext.Guilds.FirstOrDefault(g => g.Id == guildId);
         if (guild == null)
-            return new BadRequesError("Wrong guild.");
+            return new BadRequesError("Гильдия не найдена в базе данных");
         ;
-        string filePath = Path.Combine(_basePath, title + ".mp3");
+        string filePath = Path.Combine(directory, title + ".mp3");
         TimeZoneInfo moscowZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
         DateTime moscowTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, moscowZone);
         var track =  new AudioTrack()
@@ -59,35 +70,45 @@ public partial class AudioFilesService()
         }
         catch
         {
-            return new InternalError("Internal Server Error.");
+            return new InternalError("Внутренняя ошибка сервера");
         }
 
         dbContext.AudioTracks.Add(track);
         if (dbContext.SaveChanges() == 0)
-            return new InternalError("Internal Server Error.");
+            return new InternalError("Внутренняя ошибка сервера");
 
-        return new Success<AudioTrack>("Success", track);
+        return new Success<AudioTrack>("Успех", track);
     }
 
     public static async Task<Result> TrySaveFile(ApplicationDbContext dbContext, Stream downloadStream, long size, string title, ulong guildId)
     {
+        if (guildId <= 0)
+            return new BadRequesError("Не верно указан канал");
+
         if (downloadStream == null)
-            return new BadRequesError("Empty file.");
+            return new BadRequesError("Пустой файл");
 
-        if (title.Length > 12 || !LettersAndNumbersRegex().IsMatch(title))
-            return new BadRequesError("Title should include only letters and numbers and be less then 10 characters.");
+        if (title.Length > _maxTitleLength || !LettersNumbersSymbolsRegex().IsMatch(title))
+            return new BadRequesError("Ошибка названия трека");
 
-        if (!Directory.Exists(_basePath))
-            Directory.CreateDirectory(_basePath);
+        var freeSpace = new DriveInfo(AppContext.BaseDirectory).AvailableFreeSpace;
+
+        if (freeSpace < _reservedFreeSpace)
+            return new BadRequesError("Не достаточно место на диске");
+
+        var directory = Path.Combine(_basePath, guildId.ToString());
+
+        if (!Directory.Exists(directory))
+            Directory.CreateDirectory(directory);
 
         if (dbContext.AudioTracks.Any(t => t.Title == title))
             return new AlreadyExistError();
 
         var guild = dbContext.Guilds.FirstOrDefault(g => g.Id == guildId);
         if (guild == null)
-            return new BadRequesError("Wrong guild.");
+            return new BadRequesError("Гильдия не найдена в базе данных");
         ;
-        string filePath = Path.Combine(_basePath, title + ".mp3");
+        string filePath = Path.Combine(directory, title + ".mp3");
         TimeZoneInfo moscowZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
         DateTime moscowTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, moscowZone);
         var track = new AudioTrack()
@@ -106,28 +127,39 @@ public partial class AudioFilesService()
         }
         catch
         {
-            return new InternalError("Internal Server Error.");
+            return new InternalError("Внутренняя ошибка сервера");
         }
 
         dbContext.AudioTracks.Add(track);
         if (dbContext.SaveChanges() == 0)
-            return new InternalError("Internal Server Error.");
+            return new InternalError("Внутренняя ошибка сервера");
 
-        return new Success<AudioTrack>("Success", track);
+        return new Success<AudioTrack>("Успех", track);
     }
 
-    public static Result DeleteFile(ApplicationDbContext dbContext, AudioTrackDeleteDto audioTrackDto)
+    public static Result DeleteFile(ApplicationDbContext dbContext, string title)
     {
-        if (audioTrackDto == null || audioTrackDto.Title == null)
-            return new BadRequesError("File info was not provided.");
+        if (string.IsNullOrEmpty(title))
+            return new BadRequesError("Неверное название трека");
 
-        var audioTrack = dbContext.AudioTracks.FirstOrDefault(t => t.Title == audioTrackDto.Title);
+        var audioTrack = dbContext.AudioTracks
+            .FirstOrDefault(t => t.Title == title);
+
         if (audioTrack == null)
-            return new NotFoundError("Audio track was not found");
+            return new NotFoundError("Файл не найден");
+
+        try
+        {
+            File.Delete(audioTrack.Path);
+        }
+        catch
+        {
+            return new InternalError("Внутреняя ошибка сервера");
+        }
 
         dbContext.AudioTracks.Remove(audioTrack);
         if (dbContext.SaveChanges() == 0)
-            return new InternalError("Internal Server Error.");
+            return new InternalError("Внутреняя ошибка сервера");
 
         return Success.Empty;
     }
@@ -148,6 +180,6 @@ public partial class AudioFilesService()
         return audioTrack.Path;
     }
 
-    [GeneratedRegex(@"^[a-zA-Z0-9]+$")]
-    private static partial Regex LettersAndNumbersRegex();
+    [GeneratedRegex(@"^[\p{L}\p{N}_*. ,:&?!@#$%()<>-]+$")]
+    private static partial Regex LettersNumbersSymbolsRegex();
 }

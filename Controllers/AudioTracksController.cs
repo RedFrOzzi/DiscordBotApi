@@ -103,15 +103,7 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
         if (string.IsNullOrEmpty(title))
             return BadRequest("Provided data is not valid");
 
-        var track = _dbContext.AudioTracks
-            .FirstOrDefault(t => t.Title == title);
-
-        if (track == null)
-            return NotFound();
-
-        _dbContext.AudioTracks.Remove(track);
-        if (_dbContext.SaveChanges() == 0)
-            return StatusCode(StatusCodes.Status500InternalServerError);
+        AudioFilesService.DeleteFile(_dbContext, title);
 
         return Ok();
     }
