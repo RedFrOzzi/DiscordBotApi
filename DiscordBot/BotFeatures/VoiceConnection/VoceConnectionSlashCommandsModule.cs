@@ -2,6 +2,7 @@
 using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot.Services;
+using DiscordBotApi.Utilities;
 using DiscordBotApi.Utilities.Result;
 using Microsoft.EntityFrameworkCore;
 using NetCord;
@@ -14,12 +15,14 @@ namespace DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 [SlashCommand("аудио", "Команды, связанные с аудио каналами")]
 public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInstancesContainer,
     ApplicationDbContext dbContext,
-    IHttpClientFactory httpClientFactory) 
+    IHttpClientFactory httpClientFactory,
+    AsyncTimersCollection timers) 
     : ApplicationCommandModule<ApplicationCommandContext>
 {
     readonly VoiceInstancesContainer _viContainer = voiceInstancesContainer;
     readonly ApplicationDbContext _dbContext = dbContext;
     readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
+    readonly AsyncTimersCollection _timers = timers;
 
     [SubSlashCommand("присоединиться", "Присоединяется к голосовому каналу")]
     public async Task ConnectToChannel()
@@ -109,6 +112,8 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             throw;
         }
 
+        _timers.CreateOrResetTimer(guildId, TryDisconnectTheBot);
+
         await ModifyResponseAsync(m => m.Content = "Готово.");
     }
 
@@ -154,6 +159,8 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
                 await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
             }
         }
+
+        _timers.StopTheTimer(guildId);
 
         await RespondAsync(InteractionCallback.Message(new InteractionMessageProperties()
                     .WithContent("Бот покинул голосовой канал.")
@@ -365,6 +372,9 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             msgIds[k] = msg.Id;
         }
 
+        if (Context.Guild != null)
+            audioPanel.GuildId = Context.Guild.Id;
+
         audioPanel.ChannelId = Context.Channel.Id;
         audioPanel.MessageIds = msgIds;
 
@@ -457,6 +467,9 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
                 msgIds[k] = msg.Id;
         }
 
+        if (Context.Guild != null)
+            audioPanel.GuildId = Context.Guild.Id;
+
         audioPanel.ChannelId = Context.Channel.Id;
         audioPanel.MessageIds = msgIds;
 
@@ -480,5 +493,30 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             }
         }
         catch { }
+    }
+
+    private async Task TryDisconnectTheBot()
+    {
+        if (Context.Guild == null)
+            return;
+
+        var guildId = Context.Guild.Id;
+
+        if (!_viContainer.VoiceInstances.TryGetValue(guildId, out var voiceInstance) || voiceInstance is null)
+            return;
+
+        if (_viContainer.VoiceInstances.TryRemove(item: new(guildId, voiceInstance)))
+        {
+            try
+            {
+                await voiceInstance.Client.CloseAsync();
+            }
+            finally
+            {
+                voiceInstance.Dispose();
+
+                await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
+            }
+        }
     }
 }

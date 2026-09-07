@@ -39,6 +39,10 @@ try
     DotEnv.Load();
     builder.Configuration.AddEnvironmentVariables();
     var securityKey = Environment.GetEnvironmentVariable("SECURITY_KEY") ?? throw new("Security key was null");
+    var voiceDisconnectDelayString = Environment.GetEnvironmentVariable("VOICE_DISCONNECT_DELAY");
+    int voiceDisconnectDelay = 120;
+    if (!string.IsNullOrWhiteSpace(voiceDisconnectDelayString)
+        && int.TryParse(voiceDisconnectDelayString, out voiceDisconnectDelay))
 
     builder.Services.AddCors(options =>
     {
@@ -85,6 +89,11 @@ try
     builder.Services.AddSingleton<PasswordHasher>();
     builder.Services.AddSingleton<TokenProvider>();
     builder.Services.AddSingleton<VoiceInstancesContainer>();
+    builder.Services.AddSingleton<AsyncTimersCollection>(sp => 
+    {
+        var lifetime = sp.GetRequiredService<IHostApplicationLifetime>();
+        return new AsyncTimersCollection(voiceDisconnectDelay, lifetime);
+    });
 
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {

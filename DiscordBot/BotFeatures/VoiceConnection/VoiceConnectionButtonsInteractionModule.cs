@@ -1,19 +1,25 @@
 ﻿using DiscordBotApi.Database;
+using DiscordBotApi.Utilities;
 using Microsoft.EntityFrameworkCore;
 using NetCord;
+using NetCord.Gateway;
 using NetCord.Gateway.Voice;
 using NetCord.Rest;
 using NetCord.Services.ComponentInteractions;
 using Serilog;
+using System.ComponentModel;
 using System.Diagnostics;
 
 namespace DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 
-public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbContext, VoiceInstancesContainer voiceInstancesContainer)
+public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbContext,
+    VoiceInstancesContainer voiceInstancesContainer,
+    AsyncTimersCollection timers)
     : ComponentInteractionModule<ButtonInteractionContext>
 {
     readonly ApplicationDbContext _dbContext = dbContext;
     readonly VoiceInstancesContainer _voiceInstancesContainer = voiceInstancesContainer;
+    readonly AsyncTimersCollection _timers = timers;
 
     [ComponentInteraction(VoiceConnectionConstants.VoicePanelButtonId)]
     public async Task HandleAudioButton(string title)
@@ -176,6 +182,34 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
 
             if (ex is not OperationCanceledException and not AggregateException { InnerException: OperationCanceledException })
                 throw;
+        }
+
+        _timers.CreateOrResetTimer(guild.Id, TryDisconnectTheBot);
+    }
+
+
+    private async Task TryDisconnectTheBot()
+    {
+        if (Context.Guild == null)
+            return;
+
+        var guildId = Context.Guild.Id;
+
+        if (!_voiceInstancesContainer.VoiceInstances.TryGetValue(guildId, out var voiceInstance) || voiceInstance is null)
+            return;
+
+        if (_voiceInstancesContainer.VoiceInstances.TryRemove(item: new(guildId, voiceInstance)))
+        {
+            try
+            {
+                await voiceInstance.Client.CloseAsync();
+            }
+            finally
+            {
+                voiceInstance.Dispose();
+
+                await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
+            }
         }
     }
 }
