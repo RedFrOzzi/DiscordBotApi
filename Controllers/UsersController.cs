@@ -8,14 +8,14 @@ using Microsoft.EntityFrameworkCore;
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("users")]
 public class UsersController(ApplicationDbContext context, PasswordHasher passwordHasher, TokenProvider tokenProvider) : ControllerBase
 {
     readonly ApplicationDbContext _context = context;
     readonly PasswordHasher _passwordHasher = passwordHasher;
     readonly TokenProvider _tokenProvider = tokenProvider;
 
-    [HttpPost("/create")]
+    [HttpPost("create")]
     [ProducesResponseType(201)]
     [ProducesResponseType(400)]
     [ProducesResponseType(409)]
@@ -53,7 +53,7 @@ public class UsersController(ApplicationDbContext context, PasswordHasher passwo
         return Created();
     }
 
-    [HttpPost("/login")]
+    [HttpPost("login")]
     [ProducesResponseType<string>(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]
@@ -83,7 +83,7 @@ public class UsersController(ApplicationDbContext context, PasswordHasher passwo
         return Ok(token);
     }
 
-    [HttpPost("/create-admin")]
+    [HttpPost("create-admin")]
     [Authorize]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
@@ -134,7 +134,7 @@ public class UsersController(ApplicationDbContext context, PasswordHasher passwo
         return StatusCode(StatusCodes.Status500InternalServerError);
     }
 
-    [HttpPost("/create-moderator")]
+    [HttpPost("create-moderator")]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]

@@ -8,10 +8,10 @@ using System.Text.Json;
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("webhooks")]
 public class WebHooksController : ControllerBase
 {
-    [HttpPost("/update")]
+    [HttpPost("update")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]

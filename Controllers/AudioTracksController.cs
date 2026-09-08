@@ -10,12 +10,12 @@ namespace DiscordBotApi.Controllers;
 
 [ApiController]
 [Authorize(Roles = "Admin, Moderator")]
-[Route("[controller]")]
+[Route("audio-tracks")]
 public class AudioTracksController(ApplicationDbContext context) : ControllerBase
 {
     readonly ApplicationDbContext _dbContext = context;
 
-    [HttpPost("/upload")]
+    [HttpPost("upload")]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(201)]
     [ProducesResponseType(400)]
@@ -46,7 +46,7 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
         };
     }
 
-    [HttpGet("/get")]
+    [HttpGet("get")]
     [ProducesResponseType<AudioTrackGetDto>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetAudioTrackByTitle([FromQuery] string? title)
@@ -72,7 +72,7 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
         return Ok(track);
     }
 
-    [HttpGet("/get-all")]
+    [HttpGet("get-all")]
     [ProducesResponseType<IEnumerable<AudioTrackGetDto>>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetAudioTracks()
@@ -94,7 +94,7 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
         return Ok(tracks);
     }
 
-    [HttpDelete("/delete")]
+    [HttpDelete("delete")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
     [ProducesResponseType(500)]

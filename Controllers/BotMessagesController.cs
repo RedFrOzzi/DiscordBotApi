@@ -7,7 +7,7 @@ using NetCord.Rest;
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("bot-messages")]
 [Authorize(Roles = "Admin, Moderator")]
 public class BotMessagesController(GatewayClient client) : ControllerBase
 {
@@ -15,7 +15,7 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
 
     //------------------------------------------------------SEND-MESSAGES-------------------------------------------------------------------------------------------------------------
 
-    [HttpPost("/send-props")]
+    [HttpPost("send-props")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(500)]
@@ -34,7 +34,7 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
         return Ok();
     }
 
-    [HttpPost("/send-message")]
+    [HttpPost("send-message")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(500)]
@@ -51,7 +51,7 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
         return Ok();
     }
 
-    [HttpPost("/send-embed")]
+    [HttpPost("send-embed")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(500)]
@@ -74,7 +74,7 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
 
     //------------------------------------------------------DELETE-MESSAGES-------------------------------------------------------------------------------------------------------------
 
-    [HttpDelete("/delete-bot-messages")]
+    [HttpDelete("delete-bot-messages")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(500)]
@@ -92,7 +92,7 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
         return Ok();
     }
 
-    [HttpDelete("/delete-message")]
+    [HttpDelete("delete-message")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(500)]
@@ -109,7 +109,7 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
         return Ok();
     }
 
-    [HttpDelete("/delete-messages")]
+    [HttpDelete("delete-messages")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(500)]

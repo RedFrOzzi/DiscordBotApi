@@ -9,14 +9,14 @@ using NetCord.Gateway;
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("channels")]
 [Authorize(Roles = "Admin, Moderator")]
 public class DiscordChannelsController(ApplicationDbContext context, GatewayClient client) : ControllerBase
 {
     readonly ApplicationDbContext _context = context;
     readonly GatewayClient _client = client;
 
-    [HttpGet("/channels/get-channels")]
+    [HttpGet("saved-channels")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetChannels()
@@ -40,7 +40,7 @@ public class DiscordChannelsController(ApplicationDbContext context, GatewayClie
         return Ok(channels);
     }
 
-    [HttpGet("/channels/get-discord-channels")]
+    [HttpGet("get-discord-channels")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetChannelsFromDiscord([FromQuery] ulong guildId, CancellationToken cancellationToken)

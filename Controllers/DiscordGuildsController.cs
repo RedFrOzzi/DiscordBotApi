@@ -8,14 +8,14 @@ using NetCord.Gateway;
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("guilds")]
 [Authorize(Roles = "Admin, Moderator")]
 public class DiscordGuildsController(ApplicationDbContext context, GatewayClient client) : ControllerBase
 {
     readonly ApplicationDbContext _context = context;
     readonly GatewayClient _client = client;
 
-    [HttpGet("/guilds/get-guilds")]
+    [HttpGet("all-guilds")]
     [ProducesResponseType<List<DiscordGuildGetDto>>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetGuilds()
@@ -39,7 +39,7 @@ public class DiscordGuildsController(ApplicationDbContext context, GatewayClient
         return Ok(guilds);
     }
 
-    [HttpGet("/guilds/get-guild")]
+    [HttpGet("guild")]
     [ProducesResponseType<DiscordGuildGetDto>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetGuild([FromQuery] ulong guildId)
