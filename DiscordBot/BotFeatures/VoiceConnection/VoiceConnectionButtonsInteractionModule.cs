@@ -193,14 +193,10 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
         await RespondAsync(InteractionCallback.DeferredModifyMessage);
 
         if (Context.Guild is not { } guild)
-        {
             return;
-        }
 
         if (!_voiceInstancesContainer.VoiceInstances.TryGetValue(guild.Id, out var voiceInstance) || voiceInstance is null)
-        {
             return;
-        }
 
         voiceInstance.StopPlaying();
     }

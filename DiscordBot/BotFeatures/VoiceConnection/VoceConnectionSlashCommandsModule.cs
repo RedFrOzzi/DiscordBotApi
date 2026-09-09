@@ -348,7 +348,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
                 //Add stop button
                 if (audioTracksIndex == 0)
                 {
-                    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", EmojiProperties.Standard("🛑"), NetCord.ButtonStyle.Danger);
+                    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", NetCord.ButtonStyle.Danger);
                     currentActionRow.AddComponents(stopButton);
                     currComponentsCount++;
                     continue;
@@ -453,7 +453,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             {
                 if (audioTracksIndex == 0)
                 {
-                    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", EmojiProperties.Standard("🛑"), NetCord.ButtonStyle.Danger);
+                    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", NetCord.ButtonStyle.Danger);
                     currentActionRow.AddComponents(stopButton);
                     currComponentsCount++;
                     continue;
