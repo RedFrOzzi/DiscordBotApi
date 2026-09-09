@@ -3,5 +3,5 @@
 public static class VoiceConnectionConstants
 {
     public const string VoicePanelButtonId = "voicepanelbutton";
-    public const string VoicePanelRebuildButtonId = "voicepanelrebuild";
+    public const string VoicePanelStopButtonId = "voicepanelstop";
 }

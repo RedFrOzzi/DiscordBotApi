@@ -2,12 +2,10 @@
 using DiscordBotApi.Utilities;
 using Microsoft.EntityFrameworkCore;
 using NetCord;
-using NetCord.Gateway;
 using NetCord.Gateway.Voice;
 using NetCord.Rest;
 using NetCord.Services.ComponentInteractions;
 using Serilog;
-using System.ComponentModel;
 using System.Diagnostics;
 
 namespace DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
