@@ -45,6 +45,14 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
         if (track == null)
         {
             Log.Error("User with id: {0} invoke audio play, but track with title: {1} was not found.", Context?.User?.Id, title);
+            await FollowupAsync(new() { Content = "Трек не найден" });
+            return;
+        }
+
+        if (!File.Exists(track.Path))
+        {
+            Log.Error("User with id: {0} invoke audio play, but path was not correct", Context?.User?.Id);
+            await FollowupAsync(new() { Content = "Некорректный путь файла" });
             return;
         }
 
@@ -145,12 +153,6 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
                                                       VoiceChannels.Stereo,
                                                       OpusApplication.Audio);
 
-        if (!File.Exists(track.Path))
-        {
-            Log.Error("User with id: {0} invoke audio play, but path was not correct", Context?.User?.Id);
-            return;
-        }
-
         var ffmpegPath = Environment.GetEnvironmentVariable("FFMPEG_FILE_PATH") ?? "ffmpeg";
 
         using var ffmpeg = Process.Start(new ProcessStartInfo
@@ -183,6 +185,24 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
         }
 
         _timers.CreateOrResetTimer(guild.Id, TryDisconnectTheBot);
+    }
+
+    [ComponentInteraction(VoiceConnectionConstants.VoicePanelStopButtonId)]
+    public async Task HandleStopAudioButton()
+    {
+        await RespondAsync(InteractionCallback.DeferredModifyMessage);
+
+        if (Context.Guild is not { } guild)
+        {
+            return;
+        }
+
+        if (!_voiceInstancesContainer.VoiceInstances.TryGetValue(guild.Id, out var voiceInstance) || voiceInstance is null)
+        {
+            return;
+        }
+
+        voiceInstance.StopPlaying();
     }
 
 

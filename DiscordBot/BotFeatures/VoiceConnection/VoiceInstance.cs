@@ -4,19 +4,32 @@ namespace DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 
 public sealed class VoiceInstance(VoiceClient client) : IDisposable
 {
-    private static readonly int _jobTypeCount = Enum.GetValues<VoiceJobType>().Length;
-
     public VoiceClient Client => client;
 
-    private readonly CancellationTokenSource _cancellationTokenSource = new();
-
-    private readonly byte[] _jobStatuses = new byte[_jobTypeCount];
+    static readonly int _jobTypeCount = Enum.GetValues<VoiceJobType>().Length;
+    CancellationTokenSource _cancellationTokenSource = new();
+    readonly byte[] _jobStatuses = new byte[_jobTypeCount];
+    readonly Lock _lock = new();
 
     public Job? TryEnterJob(VoiceJobType type)
     {
         return Interlocked.CompareExchange(ref _jobStatuses[(int)type], 1, 0) is 0
             ? new(this, type, _cancellationTokenSource.Token)
             : null;
+    }
+
+    public void StopPlaying()
+    {
+        lock (_lock)
+        {
+            if (Interlocked.CompareExchange(ref _jobStatuses[(int)VoiceJobType.Playing], 0, 1) != 1)
+                return;
+
+            _cancellationTokenSource.Cancel();
+            _cancellationTokenSource.Dispose();
+
+            _cancellationTokenSource = new CancellationTokenSource();
+        }
     }
 
     public void Dispose()
