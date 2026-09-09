@@ -429,9 +429,10 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             await TryDeleteAudioPanelMessages(audioPanel, Context);
         }
 
+        int audioTracksCount = audioTracks.Count + 1;
         int audioTracksIndex = 0;
-        int messagesCount = audioTracks.Count / 25;
-        var remainder = audioTracks.Count % 25;
+        int messagesCount = audioTracksCount / 25;
+        var remainder = audioTracksCount % 25;
         if (remainder != 0)
         {
             messagesCount++;
@@ -448,9 +449,17 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             ActionRowProperties currentActionRow = new();
             mProps.AddComponents(currentActionRow);
 
-            for (int i = 0; i < audioTracks.Count && i < 25; i++)
+            for (int i = 0; i < audioTracksCount && i < 25; i++)
             {
-                var title = audioTracks[audioTracksIndex].Title;
+                if (audioTracksIndex == 0)
+                {
+                    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", EmojiProperties.Standard("🛑"), NetCord.ButtonStyle.Danger);
+                    currentActionRow.AddComponents(stopButton);
+                    currComponentsCount++;
+                    continue;
+                }
+
+                var title = audioTracks[audioTracksIndex - 1].Title;
                 ButtonProperties button = new($"{VoiceConnectionConstants.VoicePanelButtonId}:{title}", title, NetCord.ButtonStyle.Primary);
                 currentActionRow.AddComponents(button);
                 currComponentsCount++;
