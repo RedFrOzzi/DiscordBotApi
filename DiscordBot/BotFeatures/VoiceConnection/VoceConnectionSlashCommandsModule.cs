@@ -12,7 +12,7 @@ using NetCord.Services.ApplicationCommands;
 
 namespace DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 
-[SlashCommand("аудио", "Команды, связанные с аудио каналами")]
+[SlashCommand("голос", "Команды, связанные с аудио каналами")]
 public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInstancesContainer,
     ApplicationDbContext dbContext,
     IHttpClientFactory httpClientFactory,
@@ -322,9 +322,10 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             await TryDeleteAudioPanelMessages(audioPanel, Context);
         }
 
+        int tracksCount = audioTracks.Count + 1;
         int audioTracksIndex = 0;
-        int messagesCount = audioTracks.Count / 25;
-        var remainder = audioTracks.Count % 25;
+        int messagesCount = tracksCount / 25;
+        var remainder = tracksCount % 25;
         if (remainder != 0)
         {
             messagesCount++;
@@ -342,25 +343,26 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             ActionRowProperties currentActionRow = new();
             mProps.AddComponents(currentActionRow);
 
-            for (int i = 0; i < audioTracks.Count && i < 25; i++)
+            for (int i = 0; i < tracksCount && i < 25; i++)
             {
                 //Add stop button
-                //if (audioTracksIndex == 0)
-                //{
-                //    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", NetCord.ButtonStyle.Danger);
-                //    currentActionRow.AddComponents(stopButton);
-                //    currComponentsCount++;
-                //    continue;
-                //}
+                if (audioTracksIndex == 0)
+                {
+                    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", NetCord.ButtonStyle.Danger);
+                    currentActionRow.AddComponents(stopButton);
+                    currComponentsCount++;
+                    audioTracksIndex++;
+                    continue;
+                }
 
-                var title = audioTracks[audioTracksIndex].Title;
+                var title = audioTracks[audioTracksIndex - 1].Title;
                 ButtonProperties button = new($"{VoiceConnectionConstants.VoicePanelButtonId}:{title}", title, NetCord.ButtonStyle.Primary);
                 currentActionRow.AddComponents(button);
                 currComponentsCount++;
 
                 //Add new action row if its not last itteration
                 if (currComponentsCount == 5
-                    && i != audioTracks.Count - 1
+                    && i != tracksCount - 1
                     && i != 24)
                 {
                     currComponentsCount = 0;
@@ -428,9 +430,10 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             await TryDeleteAudioPanelMessages(audioPanel, Context);
         }
 
+        int tracksCount = audioTracks.Count + 1;
         int audioTracksIndex = 0;
-        int messagesCount = audioTracks.Count / 25;
-        var remainder = audioTracks.Count % 25;
+        int messagesCount = tracksCount / 25;
+        var remainder = tracksCount % 25;
         if (remainder != 0)
         {
             messagesCount++;
@@ -447,24 +450,25 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             ActionRowProperties currentActionRow = new();
             mProps.AddComponents(currentActionRow);
 
-            for (int i = 0; i < audioTracks.Count && i < 25; i++)
+            for (int i = 0; i < tracksCount && i < 25; i++)
             {
-                //if (audioTracksIndex == 0)
-                //{
-                //    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", NetCord.ButtonStyle.Danger);
-                //    currentActionRow.AddComponents(stopButton);
-                //    currComponentsCount++;
-                //    continue;
-                //}
+                if (audioTracksIndex == 0)
+                {
+                    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", NetCord.ButtonStyle.Danger);
+                    currentActionRow.AddComponents(stopButton);
+                    currComponentsCount++;
+                    audioTracksIndex++;
+                    continue;
+                }
 
-                var title = audioTracks[audioTracksIndex].Title;
+                var title = audioTracks[audioTracksIndex - 1].Title;
                 ButtonProperties button = new($"{VoiceConnectionConstants.VoicePanelButtonId}:{title}", title, NetCord.ButtonStyle.Primary);
                 currentActionRow.AddComponents(button);
                 currComponentsCount++;
 
                 //Add new action row if its not last itteration
                 if (currComponentsCount == 5
-                    && i != audioTracks.Count - 1
+                    && i != tracksCount - 1
                     && i != 24)
                 {
                     currComponentsCount = 0;
