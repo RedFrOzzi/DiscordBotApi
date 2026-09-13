@@ -252,7 +252,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             return;
         }
 
-        await RebuildAudioPanel(guild.Id);
+        await CreateAudioPanel(guild.Id);
 
         await ModifyResponseAsync(m => m.Content = "Готово.");
     }
@@ -288,7 +288,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             return;
         }
 
-        await RebuildAudioPanel(guild.Id);
+        await CreateAudioPanel(guild.Id);
 
         await ModifyResponseAsync(m => m.Content = "Готово.");
     }
@@ -322,58 +322,38 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             await TryDeleteAudioPanelMessages(audioPanel, Context);
         }
 
-        int tracksCount = audioTracks.Count + 1;
-        int audioTracksIndex = 0;
-        int messagesCount = tracksCount / 25;
-        var remainder = tracksCount % 25;
-        if (remainder != 0)
+        var buttons = new List<ButtonProperties>
         {
-            messagesCount++;
+            new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", ButtonStyle.Danger)
+        };
+
+        foreach (var track in audioTracks)
+        {
+            buttons.Add(new ButtonProperties(
+                $"{VoiceConnectionConstants.VoicePanelButtonId}:{track.Title}", track.Title, ButtonStyle.Primary));
         }
 
-        bool isAnswered = false;
-        InteractionMessageProperties[] panelMessages = new InteractionMessageProperties[messagesCount];
-
-        for (int j = 0; j < messagesCount; j++)
+        var actionRows = new List<ActionRowProperties>();
+        for (int i = 0; i < buttons.Count; i += 5)
         {
-            InteractionMessageProperties mProps = new();
-            panelMessages[j] = mProps;
+            actionRows.Add(new(buttons.Skip(i).Take(5).ToArray()));
+        }
 
-            int currComponentsCount = 0;
-            ActionRowProperties currentActionRow = new();
-            mProps.AddComponents(currentActionRow);
-
-            for (int i = 0; i < tracksCount && i < 25; i++)
+        var panelMessagesList = new List<InteractionMessageProperties>();
+        for (int i = 0; i < actionRows.Count; i += 5)
+        {
+            panelMessagesList.Add(new InteractionMessageProperties
             {
-                //Add stop button
-                if (audioTracksIndex == 0)
-                {
-                    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", NetCord.ButtonStyle.Danger);
-                    currentActionRow.AddComponents(stopButton);
-                    currComponentsCount++;
-                    audioTracksIndex++;
-                    continue;
-                }
+                Components = actionRows.Skip(i).Take(5).ToArray()
+            });
+        }
 
-                var title = audioTracks[audioTracksIndex - 1].Title;
-                ButtonProperties button = new($"{VoiceConnectionConstants.VoicePanelButtonId}:{title}", title, NetCord.ButtonStyle.Primary);
-                currentActionRow.AddComponents(button);
-                currComponentsCount++;
+        InteractionMessageProperties[] panelMessages = panelMessagesList.ToArray();
 
-                //Add new action row if its not last itteration
-                if (currComponentsCount == 5
-                    && i != tracksCount - 1
-                    && i != 24)
-                {
-                    currComponentsCount = 0;
-                    currentActionRow = new();
-                    mProps.AddComponents(currentActionRow);
-                }
-
-                audioTracksIndex++;
-            }
-
-            isAnswered = true;
+        if (panelMessages.Length == 0)
+        {
+            await ModifyResponseAsync(m => m.Content = "Ошибка создания панели");
+            return;
         }
 
         ulong[] msgIds = new ulong[panelMessages.Length];
@@ -398,122 +378,23 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             await ModifyResponseAsync(m => m.Content = "Ошибка сохранения панели в базу данных.");
             return;
         }
-
-        if (isAnswered == false)
-        {
-            await ModifyResponseAsync(m => m.Content = "Ошибка создания панели.");
-        }
-    }
-
-    private async Task RebuildAudioPanel(ulong guildId)
-    {
-        var audioTracks = _dbContext.AudioTracks
-            .AsNoTracking()
-            .Include(t => t.Guild)
-            .Where(t => t.Guild.Id == guildId)
-            .ToList();
-
-        if (audioTracks == null || audioTracks.Count == 0)
-            return;
-
-        AudioPanel? audioPanel = _dbContext.AudioPanels
-            .FirstOrDefault(ap => ap.GuildId == guildId);
-
-        if (audioPanel == null || audioPanel.ChannelId <= 0 || audioPanel.GuildId <= 0 
-            || audioPanel.MessageIds == null || audioPanel.MessageIds.Length == 0)
-        {
-            return;
-        }
-        else
-        {
-            //Remove prev panel
-            await TryDeleteAudioPanelMessages(audioPanel, Context);
-        }
-
-        int tracksCount = audioTracks.Count + 1;
-        int audioTracksIndex = 0;
-        int messagesCount = tracksCount / 25;
-        var remainder = tracksCount % 25;
-        if (remainder != 0)
-        {
-            messagesCount++;
-        }
-
-        MessageProperties[] panelMessages = new MessageProperties[messagesCount];
-
-        for (int j = 0; j < messagesCount; j++)
-        {
-            MessageProperties mProps = new();
-            panelMessages[j] = mProps;
-
-            int currComponentsCount = 0;
-            ActionRowProperties currentActionRow = new();
-            mProps.AddComponents(currentActionRow);
-
-            for (int i = 0; i < tracksCount && i < 25; i++)
-            {
-                if (audioTracksIndex == 0)
-                {
-                    ButtonProperties stopButton = new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", NetCord.ButtonStyle.Danger);
-                    currentActionRow.AddComponents(stopButton);
-                    currComponentsCount++;
-                    audioTracksIndex++;
-                    continue;
-                }
-
-                var title = audioTracks[audioTracksIndex - 1].Title;
-                ButtonProperties button = new($"{VoiceConnectionConstants.VoicePanelButtonId}:{title}", title, NetCord.ButtonStyle.Primary);
-                currentActionRow.AddComponents(button);
-                currComponentsCount++;
-
-                //Add new action row if its not last itteration
-                if (currComponentsCount == 5
-                    && i != tracksCount - 1
-                    && i != 24)
-                {
-                    currComponentsCount = 0;
-                    currentActionRow = new();
-                    mProps.AddComponents(currentActionRow);
-                }
-
-                audioTracksIndex++;
-            }
-        }
-
-        ulong[] msgIds = new ulong[panelMessages.Length];
-        for (int k = 0; k < panelMessages.Length; k++)
-        {
-            var msg = await Context.Client.Rest.SendMessageAsync(audioPanel.ChannelId, panelMessages[k]);
-            if (msg != null)
-                msgIds[k] = msg.Id;
-        }
-
-        if (Context.Guild != null)
-            audioPanel.GuildId = Context.Guild.Id;
-
-        audioPanel.ChannelId = Context.Channel.Id;
-        audioPanel.MessageIds = msgIds;
-
-        try
-        {
-            _dbContext.SaveChanges();
-        }
-        catch { }
     }
 
     private static async Task TryDeleteAudioPanelMessages(AudioPanel audioPanel, ApplicationCommandContext context)
     {
-        try
+        if (audioPanel.MessageIds == null || audioPanel.MessageIds.Length <= 0)
         {
-            if (audioPanel.MessageIds != null && audioPanel.MessageIds.Length > 0)
-            {
-                foreach (var msgId in audioPanel.MessageIds)
-                {
-                    await context.Client.Rest.DeleteMessageAsync(audioPanel.ChannelId, msgId);
-                }
-            }
+            return;
         }
-        catch { }
+
+        foreach (var msgId in audioPanel.MessageIds)
+        {
+            try
+            {
+                await context.Client.Rest.DeleteMessageAsync(audioPanel.ChannelId, msgId);
+            }
+            catch { }
+        }
     }
 
     private async Task TryDisconnectTheBot()
