@@ -1,10 +1,7 @@
 ﻿using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Database;
-using DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 using DiscordBotApi.Utilities.Result;
 using Microsoft.EntityFrameworkCore;
-using NetCord.Gateway;
-using NetCord.Rest;
 using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 

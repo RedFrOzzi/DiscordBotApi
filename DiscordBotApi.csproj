@@ -36,6 +36,7 @@
     <PackageReference Include="Serilog.Sinks.File" Version="8.0.0-nblumhardt-02322" />
     <PackageReference Include="SourceGear.sqlite3" Version="3.53.3" />
     <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
+    <PackageReference Include="YoutubeDLSharp" Version="1.2.0" />
   </ItemGroup>
 
   <ItemGroup>

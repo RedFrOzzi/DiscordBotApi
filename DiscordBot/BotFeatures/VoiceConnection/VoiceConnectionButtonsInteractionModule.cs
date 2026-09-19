@@ -12,12 +12,12 @@ namespace DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 
 public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbContext,
     VoiceInstancesContainer voiceInstancesContainer,
-    AsyncTimersCollection timers)
-    : ComponentInteractionModule<ButtonInteractionContext>
+    AsyncTimersCollection timers) : ComponentInteractionModule<ButtonInteractionContext>
 {
     readonly ApplicationDbContext _dbContext = dbContext;
     readonly VoiceInstancesContainer _voiceInstancesContainer = voiceInstancesContainer;
     readonly AsyncTimersCollection _timers = timers;
+    readonly string _ffmpegPath = Environment.GetEnvironmentVariable("FFMPEG_FILE_PATH") ?? "ffmpeg";
 
     [ComponentInteraction(VoiceConnectionConstants.VoicePanelButtonId)]
     public async Task HandleAudioButton(string title)
@@ -153,11 +153,9 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
                                                       VoiceChannels.Stereo,
                                                       OpusApplication.Audio);
 
-        var ffmpegPath = Environment.GetEnvironmentVariable("FFMPEG_FILE_PATH") ?? "ffmpeg";
-
         using var ffmpeg = Process.Start(new ProcessStartInfo
         {
-            FileName = ffmpegPath,
+            FileName = _ffmpegPath,
             ArgumentList =
             {
                 "-i", track.Path,
@@ -225,5 +223,10 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
                 await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
             }
         }
+    }
+
+    private static async Task PlayAudioTrack()
+    {
+
     }
 }

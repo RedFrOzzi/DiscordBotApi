@@ -180,7 +180,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         if (await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext) is Error)
         {
-            await ModifyResponseAsync(m => m.Content = "У тебя нет прав доступа.");
+            await ModifyResponseAsync(m => m.Content = $"У пользователя {Context.User.Username} нет прав доступа для создания аудио панели.");
             return;
         }
 
@@ -190,7 +190,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
     [SubSlashCommand("сохранить_трек", "Сохраняет аудио трек из предыдущего сообщения.")]
     public async Task UploadTrackFromMessage()
     {
-        await RespondAsync(InteractionCallback.DeferredMessage(MessageFlags.Ephemeral));
+        await RespondAsync(InteractionCallback.DeferredModifyMessage);
 
         if (Context.Guild is not { } guild || Context.Channel is not { } channel)
         {
@@ -200,7 +200,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         if (await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext) is Error)
         {
-            await ModifyResponseAsync(m => m.Content = "У тебя нет прав доступа.");
+            await ModifyResponseAsync(m => m.Content = $"У пользователя { Context.User.Username } нет прав доступа для сохранения аудио.");
             return;
         }
 
@@ -229,12 +229,6 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             return;
         }
 
-        if (message.Attachments[0].Size > 9 * 1024 * 1024)
-        {
-            await ModifyResponseAsync(m => m.Content = "Файл слишком большой.");
-            return;
-        }
-
         if (!message.Attachments[0].FileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
             && message.Attachments[0].ContentType != "audio/mpeg")
         {
@@ -253,14 +247,12 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
         }
 
         await CreateAudioPanel(guild.Id);
-
-        await ModifyResponseAsync(m => m.Content = "Готово.");
     }
 
     [SubSlashCommand("удалить_трек", "Удаляет трек по названию.")]
     public async Task DeleteAudioTrack(string title)
     {
-        await RespondAsync(InteractionCallback.DeferredMessage(MessageFlags.Ephemeral));
+        await RespondAsync(InteractionCallback.DeferredModifyMessage);
 
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -276,7 +268,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         if (await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext) is Error)
         {
-            await ModifyResponseAsync(m => m.Content = "У тебя нет прав доступа.");
+            await ModifyResponseAsync(m => m.Content = $"У пользователя {Context.User.Username} нет прав доступа для удаления аудио.");
             return;
         }
 
@@ -289,8 +281,6 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
         }
 
         await CreateAudioPanel(guild.Id);
-
-        await ModifyResponseAsync(m => m.Content = "Готово.");
     }
 
 
@@ -375,7 +365,6 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
         }
         catch
         {
-            await ModifyResponseAsync(m => m.Content = "Ошибка сохранения панели в базу данных.");
             return;
         }
     }
@@ -399,24 +388,28 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
     private async Task TryDisconnectTheBot()
     {
-        if (Context.Guild == null)
-            return;
+        if (Context.Guild is null) return;
 
         var guildId = Context.Guild.Id;
 
         if (!_viContainer.VoiceInstances.TryGetValue(guildId, out var voiceInstance) || voiceInstance is null)
             return;
 
-        if (_viContainer.VoiceInstances.TryRemove(item: new(guildId, voiceInstance)))
+        if (!_viContainer.VoiceInstances.TryRemove(new(guildId, voiceInstance)))
+            return;
+
+        try
+        {
+            await voiceInstance.Client.CloseAsync();
+        }
+        finally
         {
             try
             {
-                await voiceInstance.Client.CloseAsync();
+                voiceInstance.Dispose();
             }
             finally
             {
-                voiceInstance.Dispose();
-
                 await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
             }
         }

@@ -2,6 +2,7 @@ using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Middlewares;
+using DiscordBotApi.Services;
 using DiscordBotApi.Utilities;
 using dotenv.net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -85,6 +86,7 @@ try
         .AddComponentInteractions<ChannelMenuInteraction, ChannelMenuInteractionContext>()
         .AddComponentInteractions<ModalInteraction, ModalInteractionContext>();
 
+    builder.Services.AddScoped<YtAudioExtractorService>();
     builder.Services.AddSingleton<UpdateUsersService>();
     builder.Services.AddSingleton<PasswordHasher>();
     builder.Services.AddSingleton<TokenProvider>();
