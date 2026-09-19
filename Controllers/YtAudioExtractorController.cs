@@ -72,7 +72,9 @@ public class YtAudioExtractorController(YtAudioExtractorService ytAudioExtractor
 
         if (!res.Success)
         {
-            return StatusCode(StatusCodes.Status500InternalServerError);
+            Log.Error("Error trying to extract audio: {0}", res.ErrorOutput);
+
+            return StatusCode(StatusCodes.Status500InternalServerError, res.ErrorOutput);
         }
 
         TimeZoneInfo moscowZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
@@ -94,6 +96,8 @@ public class YtAudioExtractorController(YtAudioExtractorService ytAudioExtractor
 
         if (_dbContext.SaveChanges() == 0)
         {
+            Log.Error("Error trying to save audio");
+
             return StatusCode(StatusCodes.Status500InternalServerError);
         }
 
