@@ -49,14 +49,14 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
     [HttpGet("get")]
     [ProducesResponseType<AudioTrackGetDto>(200)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> GetAudioTrackByTitle([FromBody] ulong guildId, [FromBody] string? title)
+    public async Task<IActionResult> GetAudioTrackByTitle([FromBody] AudioTrackGetByTitleDto audioTrackDto)
     {
-        if (string.IsNullOrEmpty(title))
+        if (string.IsNullOrEmpty(audioTrackDto.Title))
             return BadRequest("Provided data is not valid");
 
         var track = _dbContext.AudioTracks
             .AsNoTracking()
-            .Where(t => t.Guild.Id == guildId && t.Title == title)
+            .Where(t => t.Guild.Id == audioTrackDto.GuildId && t.Title == audioTrackDto.Title)
             .Select(t => new AudioTrackGetDto()
             {
                 Title = t.Title,
@@ -101,12 +101,12 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
     [ProducesResponseType(500)]
-    public async Task<IActionResult> DeleteAudioTrack([FromBody] ulong guildId, [FromBody] string? title)
+    public async Task<IActionResult> DeleteAudioTrack([FromBody] AudioTrackGetByTitleDto audioTrackDto)
     {
-        if (string.IsNullOrEmpty(title))
+        if (string.IsNullOrEmpty(audioTrackDto.Title))
             return BadRequest("Provided data is not valid");
 
-        var res = AudioFilesService.DeleteFile(_dbContext, guildId, title);
+        var res = AudioFilesService.DeleteFile(_dbContext, audioTrackDto.GuildId, audioTrackDto.Title);
 
         return res switch
         {
