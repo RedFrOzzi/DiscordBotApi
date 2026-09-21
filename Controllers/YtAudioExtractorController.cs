@@ -4,6 +4,7 @@ using DiscordBotApi.Database;
 using DiscordBotApi.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 using YoutubeDLSharp;
 
@@ -28,7 +29,8 @@ public class YtAudioExtractorController(YtAudioExtractorService ytAudioExtractor
         if (ytAudioExtractorData.GuildId <= 0
             || string.IsNullOrWhiteSpace(ytAudioExtractorData.URL)
             || string.IsNullOrWhiteSpace(ytAudioExtractorData.OutputName)
-            || ytAudioExtractorData.StartsAt.Equals(ytAudioExtractorData.EndsAt))
+            || ytAudioExtractorData.StartsAt.Equals(ytAudioExtractorData.EndsAt)
+            || ytAudioExtractorData.StartsAt > ytAudioExtractorData.EndsAt)
         {
             return BadRequest("Incorrect data");
         }
@@ -46,14 +48,17 @@ public class YtAudioExtractorController(YtAudioExtractorService ytAudioExtractor
 
         var filePath = Path.Combine(directory, $"{ytAudioExtractorData.OutputName}.mp3");
 
-        var track = _dbContext.AudioTracks.FirstOrDefault(at => at.Title == ytAudioExtractorData.OutputName);
+        var track = _dbContext.AudioTracks
+            .AsNoTracking()
+            .Where(t => t.Guild.Id == ytAudioExtractorData.GuildId)
+            .FirstOrDefault(at => at.Title == ytAudioExtractorData.OutputName);
 
         if (track != null)
         {
             return BadRequest(new ProblemDetails()
             {
                 Status = StatusCodes.Status409Conflict,
-                Detail = "Already exist"
+                Detail = " Audio track already exist"
             });
         }
 
@@ -74,7 +79,7 @@ public class YtAudioExtractorController(YtAudioExtractorService ytAudioExtractor
         {
             Log.Error("Error trying to extract audio: {0}", res.ErrorOutput);
 
-            return StatusCode(StatusCodes.Status500InternalServerError, res.ErrorOutput);
+            return StatusCode(StatusCodes.Status500InternalServerError);
         }
 
         TimeZoneInfo moscowZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
@@ -96,7 +101,7 @@ public class YtAudioExtractorController(YtAudioExtractorService ytAudioExtractor
 
         if (_dbContext.SaveChanges() == 0)
         {
-            Log.Error("Error trying to save audio");
+            Log.Error("Error trying to save audio in database");
 
             return StatusCode(StatusCodes.Status500InternalServerError);
         }

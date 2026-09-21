@@ -49,14 +49,14 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
     [HttpGet("get")]
     [ProducesResponseType<AudioTrackGetDto>(200)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> GetAudioTrackByTitle([FromQuery] string? title)
+    public async Task<IActionResult> GetAudioTrackByTitle([FromBody] ulong guildId, [FromBody] string? title)
     {
         if (string.IsNullOrEmpty(title))
             return BadRequest("Provided data is not valid");
 
         var track = _dbContext.AudioTracks
             .AsNoTracking()
-            .Where(t => t.Title == title)
+            .Where(t => t.Guild.Id == guildId && t.Title == title)
             .Select(t => new AudioTrackGetDto()
             {
                 Title = t.Title,
@@ -74,11 +74,13 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
 
     [HttpGet("get-all")]
     [ProducesResponseType<IEnumerable<AudioTrackGetDto>>(200)]
+    [ProducesResponseType(200)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> GetAudioTracks()
+    public async Task<IActionResult> GetAudioTracks([FromQuery] ulong guildId)
     {
         var tracks = _dbContext.AudioTracks
             .AsNoTracking()
+            .Where(t => t.Guild.Id == guildId)
             .Select(t => new AudioTrackGetDto()
             {
                 Title = t.Title,
@@ -96,15 +98,22 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
 
     [HttpDelete("delete")]
     [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
     [ProducesResponseType(404)]
     [ProducesResponseType(500)]
-    public async Task<IActionResult> DeleteAudioTrack([FromQuery] string? title)
+    public async Task<IActionResult> DeleteAudioTrack([FromBody] ulong guildId, [FromBody] string? title)
     {
         if (string.IsNullOrEmpty(title))
             return BadRequest("Provided data is not valid");
 
-        AudioFilesService.DeleteFile(_dbContext, title);
+        var res = AudioFilesService.DeleteFile(_dbContext, guildId, title);
 
-        return Ok();
+        return res switch
+        {
+            BadRequesError => BadRequest(res.Message),
+            NotFoundError => NotFound(res.Message),
+            InternalError => StatusCode(StatusCodes.Status500InternalServerError),
+            _ => Ok()
+        };
     }
 }

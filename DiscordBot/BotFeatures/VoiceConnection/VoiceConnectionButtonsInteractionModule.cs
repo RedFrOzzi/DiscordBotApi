@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using NetCord;
 using NetCord.Gateway.Voice;
 using NetCord.Rest;
+using NetCord.Services;
 using NetCord.Services.ComponentInteractions;
 using Serilog;
 using System.Diagnostics;
@@ -28,6 +29,31 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
             InteractionMessageProperties imsgp = new()
             {
                 Content = "Ошибка сервера.",
+                Flags = MessageFlags.Ephemeral
+            };
+
+            await RespondAsync(InteractionCallback.Message(imsgp));
+            return;
+        }
+
+        if (Context.User is not GuildUser user)
+        {
+            InteractionMessageProperties imsgp = new()
+            {
+                Content = "Ошибка пользователя.",
+                Flags = MessageFlags.Ephemeral
+            };
+
+            await RespondAsync(InteractionCallback.Message(imsgp));
+            return;
+        }
+
+        //Check if user and bot is in the same channel
+        if (!guild.VoiceStates.TryGetValue(Context.User.Id, out var userState))
+        {
+            InteractionMessageProperties imsgp = new()
+            {
+                Content = "Пользователь не в голосовом канале.",
                 Flags = MessageFlags.Ephemeral
             };
 
@@ -135,6 +161,20 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
         if (!_voiceInstancesContainer.VoiceInstances.TryGetValue(guild.Id, out var voiceInstance) || voiceInstance is null)
         {
             Log.Error("User with id: {0} invoke audio play, but bot was not connected", Context?.User?.Id);
+            return;
+        }
+
+        if (guild.VoiceStates.TryGetValue(Context.Interaction.ApplicationId, out var botState))
+        {
+            if (userState.ChannelId != botState.ChannelId)
+            {
+                await FollowupAsync(new() { Content = "Пользователь не в том голосовом канале." });
+                return;
+            }
+        }
+        else
+        {
+            await FollowupAsync(new() { Content = "Бот не в голосовом канале.>" });
             return;
         }
 

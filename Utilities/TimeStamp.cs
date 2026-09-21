@@ -12,19 +12,14 @@ public struct TimeStamp : IEquatable<TimeStamp>
 
     public readonly bool Equals(TimeStamp other)
     {
-        if (Hours != other.Hours
-            || Minutes != other.Minutes
-            || Seconds != other.Minutes
-            || Miliseconds != other.Miliseconds
-            || IsTillTheEnd != other.IsTillTheEnd)
-        {
-            return false;
-        }
-
-        return true;
+        return Hours == other.Hours
+            && Minutes == other.Minutes
+            && Seconds == other.Minutes
+            && Miliseconds == other.Miliseconds
+            && IsTillTheEnd == other.IsTillTheEnd;
     }
 
-    public override readonly bool Equals([NotNullWhen(true)] object? obj)
+    public override readonly bool Equals(object? obj)
     {
         if (obj == null || obj is not TimeStamp ts)
             return false;
@@ -55,5 +50,69 @@ public struct TimeStamp : IEquatable<TimeStamp>
     public static bool operator !=(TimeStamp left, TimeStamp right)
     {
         return !(left == right);
+    }
+
+    public static bool operator <(TimeStamp left, TimeStamp right)
+    {
+        if (left.Equals(right))
+        {
+            return false;
+        }
+
+        if (left.IsTillTheEnd && right.IsTillTheEnd)
+        {
+            return false;
+        }
+
+        if (!left.IsTillTheEnd && right.IsTillTheEnd)
+        {
+            return true;
+        }
+
+        if (left.Hours > right.Hours)
+            return false;
+
+        if (left.Minutes > right.Minutes)
+            return false;
+
+        if (left.Seconds > right.Seconds)
+            return false;
+
+        if (left.Miliseconds > right.Miliseconds)
+            return false;
+
+        return true;
+    }
+
+    public static bool operator >(TimeStamp left, TimeStamp right)
+    {
+        if (left.Equals(right))
+        {
+            return false;
+        }
+
+        if (left.IsTillTheEnd && right.IsTillTheEnd)
+        {
+            return false;
+        }
+
+        if (left.IsTillTheEnd && !right.IsTillTheEnd)
+        {
+            return true;
+        }
+
+        if (left.Hours < right.Hours)
+            return false;
+
+        if (left.Minutes < right.Minutes)
+            return false;
+
+        if (left.Seconds < right.Seconds)
+            return false;
+
+        if (left.Miliseconds < right.Miliseconds)
+            return false;
+
+        return true;
     }
 }

@@ -272,7 +272,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             return;
         }
 
-        var result = AudioFilesService.DeleteFile(_dbContext, title);
+        var result = AudioFilesService.DeleteFile(_dbContext, guild.Id, title);
 
         if (result is not Success)
         {

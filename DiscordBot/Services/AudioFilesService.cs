@@ -41,7 +41,7 @@ public partial class AudioFilesService()
         if (!Directory.Exists(directory))
             Directory.CreateDirectory(directory);
 
-        if (dbContext.AudioTracks.Any(t => t.Title == title))
+        if (dbContext.AudioTracks.Any(t => t.Guild.Id == guildId && t.Title == title))
             return new AlreadyExistError();
 
         var guild = dbContext.Guilds.FirstOrDefault(g => g.Id == guildId);
@@ -134,13 +134,13 @@ public partial class AudioFilesService()
         return new Success<AudioTrack>("Успех", track);
     }
 
-    public static Result DeleteFile(ApplicationDbContext dbContext, string title)
+    public static Result DeleteFile(ApplicationDbContext dbContext, ulong guildId, string title)
     {
         if (string.IsNullOrEmpty(title))
             return new BadRequesError("Неверное название трека");
 
         var audioTrack = dbContext.AudioTracks
-            .FirstOrDefault(t => t.Title == title);
+            .FirstOrDefault(t => t.Guild.Id == guildId && t.Title == title);
 
         if (audioTrack == null)
             return new NotFoundError("Файл не найден");
