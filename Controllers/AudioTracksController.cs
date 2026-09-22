@@ -47,7 +47,7 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
     }
 
     [HttpGet("get")]
-    [ProducesResponseType<AudioTrackGetDto>(200)]
+    [ProducesResponseType<AudioTrackDto>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetAudioTrackByTitle([FromBody] AudioTrackGetByTitleDto audioTrackDto)
     {
@@ -57,7 +57,7 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
         var track = _dbContext.AudioTracks
             .AsNoTracking()
             .Where(t => t.Guild.Id == audioTrackDto.GuildId && t.Title == audioTrackDto.Title)
-            .Select(t => new AudioTrackGetDto()
+            .Select(t => new AudioTrackDto()
             {
                 Title = t.Title,
                 CreatedAt = t.CreatedAt.ToString(),
@@ -73,7 +73,7 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
     }
 
     [HttpGet("get-all")]
-    [ProducesResponseType<IEnumerable<AudioTrackGetDto>>(200)]
+    [ProducesResponseType<IEnumerable<AudioTrackDto>>(200)]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetAudioTracks([FromQuery] ulong guildId)
@@ -81,7 +81,7 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
         var tracks = _dbContext.AudioTracks
             .AsNoTracking()
             .Where(t => t.Guild.Id == guildId)
-            .Select(t => new AudioTrackGetDto()
+            .Select(t => new AudioTrackDto()
             {
                 Title = t.Title,
                 CreatedAt = t.CreatedAt.ToString(),
@@ -101,7 +101,7 @@ public class AudioTracksController(ApplicationDbContext context) : ControllerBas
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
     [ProducesResponseType(500)]
-    public async Task<IActionResult> DeleteAudioTrack([FromBody] AudioTrackGetByTitleDto audioTrackDto)
+    public async Task<IActionResult> DeleteAudioTrack([FromBody] AudioTrackDeleteDto audioTrackDto)
     {
         if (string.IsNullOrEmpty(audioTrackDto.Title))
             return BadRequest("Provided data is not valid");

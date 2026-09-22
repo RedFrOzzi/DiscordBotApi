@@ -16,6 +16,8 @@ public class RaffleButtonsInteractionModule(ApplicationDbContext dbContext)
     [ComponentInteraction(RaffleConstants.ButtonEndRaffleId)]
     public async Task ButtonCloseRaffle(int raffleId)
     {
+        await RespondAsync(InteractionCallback.DeferredModifyMessage);
+
         var result = await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext);
         if (result is Error)
         {
@@ -24,9 +26,8 @@ public class RaffleButtonsInteractionModule(ApplicationDbContext dbContext)
                 Content = result.Message,
                 Flags = MessageFlags.Ephemeral
             };
-            var errorMsg = InteractionCallback.Message(imsgp);
 
-            await RespondAsync(errorMsg);
+            await RespondAsync(InteractionCallback.Message(imsgp));
             return;
         }
 

@@ -8,6 +8,7 @@ using dotenv.net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NetCord;
 using NetCord.Hosting.Gateway;
@@ -101,6 +102,8 @@ try
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
                                   ForwardedHeaders.XForwardedProto;
+        options.KnownProxies.Clear();
+        options.KnownIPNetworks.Clear();
         options.KnownProxies.Add(IPAddress.Parse("127.0.0.1"));
     });
 
@@ -120,14 +123,17 @@ try
 
     var app = builder.Build();
 
-    app.UseSerilogRequestLogging();
+    app.UseForwardedHeaders();
+
+    app.UseSerilogRequestLogging(options =>
+    {
+        options.EnrichDiagnosticContext = EnrichLoggingExtension.EnrichLogging;
+    });
 
     app.UseExceptionHandler();
 
     app.MapOpenApi();
     app.MapScalarApiReference();
-
-    app.UseForwardedHeaders();
 
     app.UseRouting();
 

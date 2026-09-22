@@ -31,14 +31,14 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         if (Context.Guild is not { } guild)
         {
-            await ModifyResponseAsync(m => m.Content = "Канал не найден.");
+            await ModifyResponseAsync(m => m.Content = "Канал не найден");
             return;
         }
 
         var user = Context.User;
         if (await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext) is Error)
         {
-            await ModifyResponseAsync(m => m.Content = "У тебя нет прав доступа.");
+            await ModifyResponseAsync(m => m.Content = "У тебя нет прав доступа");
             return;
         }
 
@@ -47,7 +47,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             channelId = voiceState.ChannelId.GetValueOrDefault();
         else
         {
-            await ModifyResponseAsync(m => m.Content = "Ты должен находиться в голосовм канале.");
+            await ModifyResponseAsync(m => m.Content = "Ты должен находиться в голосовм канале");
             return;
         }
 
@@ -55,7 +55,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         if (!_viContainer.VoiceInstances.TryAdd(guildId, null))
         {
-            await ModifyResponseAsync(m => m.Content = "Бот уже находится в голосовом канале.");
+            await ModifyResponseAsync(m => m.Content = "Бот уже находится в голосовом канале");
             return;
         }
 
@@ -81,7 +81,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
             await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
 
-            await ModifyResponseAsync(m => m.Content = "Не удалось зарегистрировать соединение.");
+            await ModifyResponseAsync(m => m.Content = "Не удалось зарегистрировать соединение");
             return;
         }
 
@@ -114,25 +114,23 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         _timers.CreateOrResetTimer(guildId, TryDisconnectTheBot);
 
-        await ModifyResponseAsync(m => m.Content = "Готово.");
+        await ModifyResponseAsync(m => m.Content = "Готово");
     }
 
     [SubSlashCommand("покинуть", "Покинуть голосовой канал")]
     public async Task LeaveChannel()
     {
+        await RespondAsync(InteractionCallback.DeferredMessage(MessageFlags.Ephemeral));
+
         if (Context.Guild is not { } guild)
         {
-            await RespondAsync(InteractionCallback.Message(new InteractionMessageProperties()
-                    .WithContent("Канал не найден.")
-                    .WithFlags(MessageFlags.Ephemeral)));
+            await ModifyResponseAsync(m => m.Content = "Канал не найден");
             return;
         }
 
         if (await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext) is Error)
         {
-            await RespondAsync(InteractionCallback.Message(new InteractionMessageProperties()
-                    .WithContent("У тебя нет прав доступа.")
-                    .WithFlags(MessageFlags.Ephemeral)));
+            await ModifyResponseAsync(m => m.Content = "У тебя нет прав доступа");
             return;
         }
 
@@ -140,9 +138,7 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         if (!_viContainer.VoiceInstances.TryGetValue(guildId, out var voiceInstance) || voiceInstance is null)
         {
-            await RespondAsync(InteractionCallback.Message(new InteractionMessageProperties()
-                    .WithContent("Бот не подключен к голосовому каналу.")
-                    .WithFlags(MessageFlags.Ephemeral)));
+            await ModifyResponseAsync(m => m.Content = "Бот не подключен к голосовому каналу");
             return;
         }
 
@@ -162,45 +158,43 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         _timers.StopTheTimer(guildId);
 
-        await RespondAsync(InteractionCallback.Message(new InteractionMessageProperties()
-                    .WithContent("Бот покинул голосовой канал.")
-                    .WithFlags(MessageFlags.Ephemeral)));
+        await ModifyResponseAsync(m => m.Content = "Бот покинул голосовой канал");
     }
 
     [SubSlashCommand("создать_аудио_панель", "Создает аудио панель в этом канале")]
     public async Task CreateAudioPanel()
     {
-        await RespondAsync(InteractionCallback.DeferredMessage());
-
-        if (Context.Guild is not { } guild)
-        {
-            await ModifyResponseAsync(m => m.Content = "Канал не найден.");
-            return;
-        }
-
-        if (await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext) is Error)
-        {
-            await ModifyResponseAsync(m => m.Content = $"У пользователя {Context.User.Username} нет прав доступа для создания аудио панели.");
-            return;
-        }
-
-        await CreateAudioPanel(guild.Id);
-    }
-
-    [SubSlashCommand("сохранить_трек", "Сохраняет аудио трек из предыдущего сообщения.")]
-    public async Task UploadTrackFromMessage()
-    {
-        await RespondAsync(InteractionCallback.DeferredModifyMessage);
+        await RespondAsync(InteractionCallback.DeferredMessage(MessageFlags.Ephemeral));
 
         if (Context.Guild is not { } guild || Context.Channel is not { } channel)
         {
-            await ModifyResponseAsync(m => m.Content = "Канал не найден.");
+            await ModifyResponseAsync(m => m.Content = "Канал не найден");
             return;
         }
 
         if (await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext) is Error)
         {
-            await ModifyResponseAsync(m => m.Content = $"У пользователя { Context.User.Username } нет прав доступа для сохранения аудио.");
+            await ModifyResponseAsync(m => m.Content = $"У пользователя {Context.User.Username} нет прав доступа для создания аудио панели");
+            return;
+        }
+
+        await CreateAP(this, _dbContext, guild.Id, channel.Id);
+    }
+
+    [SubSlashCommand("сохранить_трек", "Сохраняет аудио трек из предыдущего сообщения")]
+    public async Task UploadTrackFromMessage()
+    {
+        await RespondAsync(InteractionCallback.DeferredMessage(MessageFlags.Ephemeral));
+
+        if (Context.Guild is not { } guild || Context.Channel is not { } channel)
+        {
+            await ModifyResponseAsync(m => m.Content = "Канал не найден");
+            return;
+        }
+
+        if (await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext) is Error)
+        {
+            await ModifyResponseAsync(m => m.Content = $"У пользователя { Context.User.Username } нет прав доступа для сохранения аудио");
             return;
         }
 
@@ -225,14 +219,14 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         if (message.Attachments.Count == 0 || message.Attachments[0] == null || string.IsNullOrEmpty(message.Content))
         {
-            await ModifyResponseAsync(m => m.Content = "В сообщении нет вложений или названия.");
+            await ModifyResponseAsync(m => m.Content = "В сообщении нет вложений или названия");
             return;
         }
 
         if (!message.Attachments[0].FileName.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase)
             && message.Attachments[0].ContentType != "audio/mpeg")
         {
-            await ModifyResponseAsync(m => m.Content = "Не верный формат файла.");
+            await ModifyResponseAsync(m => m.Content = "Не верный формат файла");
             return;
         }
 
@@ -246,29 +240,35 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             return;
         }
 
-        await CreateAudioPanel(guild.Id);
+        await CreateAP(this, _dbContext, guild.Id, channel.Id);
     }
 
-    [SubSlashCommand("удалить_трек", "Удаляет трек по названию.")]
+    [SubSlashCommand("удалить_трек", "Удаляет трек по названию")]
     public async Task DeleteAudioTrack(string title)
     {
-        await RespondAsync(InteractionCallback.DeferredModifyMessage);
-
         if (string.IsNullOrWhiteSpace(title))
         {
-            await ModifyResponseAsync(m => m.Content = "Неверное название.");
+            InteractionMessageProperties imsgp = new()
+            {
+                Content = "Неверное название.",
+                Flags = MessageFlags.Ephemeral
+            };
+
+            await RespondAsync(InteractionCallback.Message(imsgp));
             return;
         }
 
+        var r = await RespondAsync(InteractionCallback.DeferredMessage(MessageFlags.Ephemeral));
+
         if (Context.Guild is not { } guild || Context.Channel is not { } channel)
         {
-            await ModifyResponseAsync(m => m.Content = "Канал не найден.");
+            await ModifyResponseAsync(m => m.Content = "Канал не найден");
             return;
         }
 
         if (await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext) is Error)
         {
-            await ModifyResponseAsync(m => m.Content = $"У пользователя {Context.User.Username} нет прав доступа для удаления аудио.");
+            await ModifyResponseAsync(m => m.Content = $"У пользователя {Context.User.Username} нет прав доступа для удаления аудио");
             return;
         }
 
@@ -280,13 +280,14 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             return;
         }
 
-        await CreateAudioPanel(guild.Id);
+        await CreateAP(this, _dbContext, guild.Id, channel.Id);
     }
 
 
-    private async Task CreateAudioPanel(ulong guildId)
+    private static async Task CreateAP(ApplicationCommandModule<ApplicationCommandContext> module,
+        ApplicationDbContext dbContext, ulong guildId, ulong channelId)
     {
-        var audioTracks = _dbContext.AudioTracks
+        var audioTracks = dbContext.AudioTracks
             .AsNoTracking()
             .Include(t => t.Guild)
             .Where(t => t.Guild.Id == guildId)
@@ -294,22 +295,22 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
 
         if (audioTracks == null || audioTracks.Count == 0)
         {
-            await ModifyResponseAsync(m => m.Content = "Отсутствуют данные в базе данных");
+            await module.ModifyResponseAsync(m => m.Content = "Отсутствуют данные в базе данных");
             return;
         }
 
-        AudioPanel? audioPanel = _dbContext.AudioPanels
+        AudioPanel? audioPanel = dbContext.AudioPanels
             .FirstOrDefault(ap => ap.GuildId == guildId);
 
         if (audioPanel == null)
         {
             audioPanel = new();
-            _dbContext.AudioPanels.Add(audioPanel);
+            dbContext.AudioPanels.Add(audioPanel);
         }
         else
         {
             //remove prev panel
-            await TryDeleteAudioPanelMessages(audioPanel, Context);
+            await TryDeleteAudioPanelMessages(audioPanel, module.Context);
         }
 
         var buttons = new List<ButtonProperties>
@@ -329,44 +330,43 @@ public class VoceConnectionSlashCommandsModule(VoiceInstancesContainer voiceInst
             actionRows.Add(new(buttons.Skip(i).Take(5).ToArray()));
         }
 
-        var panelMessagesList = new List<InteractionMessageProperties>();
+        var panelMessagesList = new List<MessageProperties>();
         for (int i = 0; i < actionRows.Count; i += 5)
         {
-            panelMessagesList.Add(new InteractionMessageProperties
+            panelMessagesList.Add(new MessageProperties
             {
                 Components = actionRows.Skip(i).Take(5).ToArray()
             });
         }
 
-        InteractionMessageProperties[] panelMessages = panelMessagesList.ToArray();
+        MessageProperties[] panelMessages = panelMessagesList.ToArray();
 
         if (panelMessages.Length == 0)
         {
-            await ModifyResponseAsync(m => m.Content = "Ошибка создания панели");
+            await module.ModifyResponseAsync(m => m.Content = "Ошибка создания панели");
             return;
         }
 
         ulong[] msgIds = new ulong[panelMessages.Length];
         for (int k = 0; k < panelMessages.Length; k++)
         {
-            var msg = await FollowupAsync(panelMessages[k]);
+            var msg = await module.Context.Client.Rest.SendMessageAsync(channelId, panelMessages[k]);
             msgIds[k] = msg.Id;
         }
 
-        if (Context.Guild != null)
-            audioPanel.GuildId = Context.Guild.Id;
+        if (module.Context.Guild != null)
+            audioPanel.GuildId = module.Context.Guild.Id;
 
-        audioPanel.ChannelId = Context.Channel.Id;
+        audioPanel.ChannelId = module.Context.Channel.Id;
         audioPanel.MessageIds = msgIds;
 
         try
         {
-            _dbContext.SaveChanges();
+            dbContext.SaveChanges();
         }
-        catch
-        {
-            return;
-        }
+        catch { }
+
+        await module.ModifyResponseAsync(m => m.Content = "Готово");
     }
 
     private static async Task TryDeleteAudioPanelMessages(AudioPanel audioPanel, ApplicationCommandContext context)

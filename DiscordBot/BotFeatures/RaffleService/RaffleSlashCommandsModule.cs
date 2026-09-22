@@ -70,7 +70,7 @@ public class RaffleSlashCommandsModule(ApplicationDbContext dbContext)
     [SubSlashCommand("статистика", "Узнать свою статистику")]
     public async Task GetRaffleStats()
     {
-        await RespondAsync(InteractionCallback.DeferredMessage(MessageFlags.Ephemeral));
+        await RespondAsync(InteractionCallback.DeferredMessage());
 
         var user = _dbContext.DiscordUsers
             .AsNoTracking()

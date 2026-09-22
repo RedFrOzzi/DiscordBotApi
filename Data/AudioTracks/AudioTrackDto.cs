@@ -1,6 +1,6 @@
 ﻿namespace DiscordBotApi.Data.AudioTracks;
 
-public class AudioTrackGetDto
+public class AudioTrackDto
 {
     public string? Title { get; set; }
     public string? GuildId { get; set; }

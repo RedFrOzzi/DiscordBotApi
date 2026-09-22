@@ -71,14 +71,14 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
         if (track == null)
         {
             Log.Error("User with id: {0} invoke audio play, but track with title: {1} was not found.", Context?.User?.Id, title);
-            await FollowupAsync(new() { Content = "Трек не найден" });
+            await FollowupAsync(new() { Content = "Трек не найден", Flags = MessageFlags.Ephemeral });
             return;
         }
 
         if (!File.Exists(track.Path))
         {
             Log.Error("User with id: {0} invoke audio play, but path was not correct", Context?.User?.Id);
-            await FollowupAsync(new() { Content = "Некорректный путь файла" });
+            await FollowupAsync(new() { Content = "Некорректный путь файла", Flags = MessageFlags.Ephemeral });
             return;
         }
 
@@ -89,7 +89,7 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
 
             if (Context.User == null)
             {
-                await FollowupAsync(new() { Content = "Пользователь не найден" });
+                await FollowupAsync(new() { Content = "Пользователь не найден", Flags = MessageFlags.Ephemeral });
                 return;
             }
 
@@ -97,7 +97,7 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
                 channelId = voiceState.ChannelId.GetValueOrDefault();
             else
             {
-                await FollowupAsync(new() { Content = "Пользователь не в голосовом канале." });
+                await FollowupAsync(new() { Content = "Пользователь не в голосовом канале.", Flags = MessageFlags.Ephemeral });
                 return;
             }
 
@@ -126,7 +126,7 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
                 vi.Dispose();
 
                 await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
-                await FollowupAsync(new() { Content = "Не удалось зарегистрировать соединение." });
+                await FollowupAsync(new() { Content = "Не удалось зарегистрировать соединение.", Flags = MessageFlags.Ephemeral });
                 return;
             }
 
@@ -161,20 +161,27 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
         if (!_voiceInstancesContainer.VoiceInstances.TryGetValue(guild.Id, out var voiceInstance) || voiceInstance is null)
         {
             Log.Error("User with id: {0} invoke audio play, but bot was not connected", Context?.User?.Id);
+            await FollowupAsync(new() { Content = "Бот не был подключен к каналу и операция прервалась.", Flags = MessageFlags.Ephemeral });
             return;
         }
 
-        if (guild.VoiceStates.TryGetValue(Context.Interaction.ApplicationId, out var botState))
+        var botUser = await Context.Client.Rest.GetGuildUserAsync(guild.Id, Context.Interaction.ApplicationId);
+        if (botUser == null)
         {
-            if (userState.ChannelId != botState.ChannelId)
-            {
-                await FollowupAsync(new() { Content = "Пользователь не в том голосовом канале." });
-                return;
-            }
+            await FollowupAsync(new() { Content = "Бот не найден.", Flags = MessageFlags.Ephemeral });
+            return;
         }
-        else
+
+        var botVoiceState = await botUser.GetVoiceStateAsync();
+        if (botVoiceState == null)
         {
-            await FollowupAsync(new() { Content = "Бот не в голосовом канале.>" });
+            await FollowupAsync(new() { Content = "Бот не в голосовом чате.", Flags = MessageFlags.Ephemeral });
+            return;
+        }
+        //guild.VoiceStates.TryGetValue(Context.Interaction.ApplicationId, out var botState)
+        if (userState.ChannelId != botVoiceState.ChannelId)
+        {
+            await FollowupAsync(new() { Content = "Пользователь не в том голосовом канале.", Flags = MessageFlags.Ephemeral });
             return;
         }
 
