@@ -1,14 +1,18 @@
-﻿using Microsoft.IdentityModel.Tokens;
-using System.Text;
-using System.Security.Claims;
+﻿using DiscordBotApi.Data.ApiUsers;
+using DiscordBotApi.Data.RefreshTokens;
+using DiscordBotApi.Database;
 using Microsoft.IdentityModel.JsonWebTokens;
-using DiscordBotApi.Data.ApiUsers;
+using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace DiscordBotApi.Utilities
 {
     public class TokenProvider(IConfiguration configuration)
     {
-        private readonly string _secret = Environment.GetEnvironmentVariable("SECURITY_KEY") ?? throw new("Secret was null");
+        readonly string _secret = Environment.GetEnvironmentVariable("SECURITY_KEY") ?? throw new("Secret was null");
+        readonly IConfiguration _configuration = configuration;
 
         public string Create(ApiUser apiUser)
         {
@@ -25,16 +29,39 @@ namespace DiscordBotApi.Utilities
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.UtcNow.AddMinutes(configuration.GetValue<int>("Jwt:ExpirationInMinutes")),
+                Expires = DateTime.UtcNow.AddMinutes(_configuration.GetValue<int>("Jwt:ExpirationInMinutes")),
                 SigningCredentials = credentials,
-                Issuer = configuration["Jwt:Issuer"],
-                Audience = configuration["Jwt:Audience"]
+                Issuer = _configuration["Jwt:Issuer"],
+                Audience = _configuration["Jwt:Audience"]
             };
 
             var handler = new JsonWebTokenHandler();
             string token = handler.CreateToken(tokenDescriptor);
 
             return token;
+        }
+
+        public RefreshToken BuildRefreshToken(ApiUser apiUser, string rawToken)
+        {
+            var hash = Hash(rawToken);
+
+            var rt = new RefreshToken
+            {
+                User = apiUser,
+                TokenHash = hash,
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddDays(_configuration.GetValue<int>("Jwt:RefreshExpirationInDays"))
+            };
+
+            return rt;
+        }
+
+        public string CreateRawRefreshToken() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
+
+        public static string Hash(string token)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(bytes);
         }
     }
 }

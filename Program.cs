@@ -53,6 +53,7 @@ try
             policy.AllowAnyOrigin()
             .AllowAnyHeader()
             .AllowAnyMethod();
+            //.AllowCredentials();
         });
     });
 

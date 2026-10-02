@@ -1,10 +1,12 @@
 ﻿using DiscordBotApi.Data.ApiUsers;
+using DiscordBotApi.Data.AudioExtractionStates;
 using DiscordBotApi.Data.AudioPanels;
 using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Data.Channels;
 using DiscordBotApi.Data.DiscordUsers;
 using DiscordBotApi.Data.Guilds;
 using DiscordBotApi.Data.Raffles;
+using DiscordBotApi.Data.RefreshTokens;
 using DiscordBotApi.Data.Roles;
 using DiscordBotApi.Data.Settings;
 using Microsoft.EntityFrameworkCore;
@@ -14,6 +16,7 @@ namespace DiscordBotApi.Database;
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
 {
     public DbSet<ApiUser> ApiUsers { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<DiscordGuild> Guilds { get; set; }
     public DbSet<DiscordChannel> Channels { get; set; }
     public DbSet<DiscordGuildRole> DiscordGuildRoles { get; set; }
@@ -27,6 +30,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     //Audio
     public DbSet<AudioTrack> AudioTracks { get; set; }
     public DbSet<AudioPanel> AudioPanels { get; set; }
+    public DbSet<AudioExtractionState> AudioExtractionState { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -47,6 +51,18 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<DiscordUser>()
             .Property(u => u.Id)
             .HasColumnType("INTEGER");
+
+        modelBuilder.Entity<RefreshToken>(e => 
+        {
+            e.HasIndex(t => t.TokenHash)
+                .IsUnique();
+
+            e.HasOne(t => t.User)
+            .WithMany()
+            .HasForeignKey("UserId")
+            .OnDelete(DeleteBehavior.Cascade);
+        });
+            
 
         modelBuilder.Entity<DiscordUser>()
             .HasMany(u => u.Guilds)
@@ -84,6 +100,11 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<DiscordChannel>(entity =>
         {
             entity.HasAlternateKey(c => c.Id);
+        });
+
+        modelBuilder.Entity<AudioExtractionState>(entity =>
+        {
+            entity.HasAlternateKey(s => s.RequestId);
         });
     }
 }

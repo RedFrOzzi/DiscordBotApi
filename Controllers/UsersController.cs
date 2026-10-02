@@ -1,4 +1,5 @@
 ﻿using DiscordBotApi.Data.ApiUsers;
+using DiscordBotApi.Data.RefreshTokens;
 using DiscordBotApi.Database;
 using DiscordBotApi.Utilities;
 using Microsoft.AspNetCore.Authorization;
@@ -9,11 +10,17 @@ namespace DiscordBotApi.Controllers;
 
 [ApiController]
 [Route("users")]
-public class UsersController(ApplicationDbContext context, PasswordHasher passwordHasher, TokenProvider tokenProvider) : ControllerBase
+public class UsersController(
+    IConfiguration configuration,
+    ApplicationDbContext context,
+    PasswordHasher passwordHasher,
+    TokenProvider tokenProvider) : ControllerBase
 {
+    readonly IConfiguration _configuration = configuration;
     readonly ApplicationDbContext _context = context;
     readonly PasswordHasher _passwordHasher = passwordHasher;
     readonly TokenProvider _tokenProvider = tokenProvider;
+    readonly string _refreshCookieName = configuration["Jwt:RefreshCookieName"] ?? "dba_refresh";
 
     [HttpPost("create")]
     [ProducesResponseType(201)]
@@ -69,7 +76,6 @@ public class UsersController(ApplicationDbContext context, PasswordHasher passwo
         }
 
         var apiUser = _context.ApiUsers
-            .AsNoTracking()
             .FirstOrDefault(u => u.Login == userDto.Login);
 
         if (apiUser == null)
@@ -80,7 +86,72 @@ public class UsersController(ApplicationDbContext context, PasswordHasher passwo
 
         var token = _tokenProvider.Create(apiUser);
 
+        var rawRefreshToken = _tokenProvider.CreateRawRefreshToken();
+        var refreshToken = _tokenProvider.BuildRefreshToken(apiUser, rawRefreshToken);
+
+        _context.RefreshTokens.Add(refreshToken);
+        _context.SaveChanges();
+
+        Response.Cookies.Append(
+            _configuration["Jwt:RefreshCookieName"] ?? "dba_refresh",
+            rawRefreshToken,
+            AuthCookies.RefreshCookieOptions());
+
         return Ok(token);
+    }
+
+    [HttpPost("refresh")]
+    [ProducesResponseType<string>(200)]
+    [ProducesResponseType(401)]
+    public async Task<IActionResult> Refresh()
+    {
+        if (!Request.Cookies.TryGetValue(_refreshCookieName, out var rawToken) || string.IsNullOrEmpty(rawToken))
+            return Unauthorized();
+
+        var hash = TokenProvider.Hash(rawToken);
+
+        var stored = _context.RefreshTokens
+            .Include(t => t.User)
+            .FirstOrDefault(t => t.TokenHash == hash);
+
+        if (stored is null || !stored.IsActive)
+        {
+            Response.Cookies.Delete(_refreshCookieName, AuthCookies.RefreshCookieOptions());
+            return Unauthorized();
+        }
+
+        stored.RevokedAt = DateTime.UtcNow;
+        var newRawRefreshToken = _tokenProvider.CreateRawRefreshToken();
+        var newRefreshToken = _tokenProvider.BuildRefreshToken(stored.User, newRawRefreshToken);
+
+        _context.RefreshTokens.Add(newRefreshToken);
+        _context.SaveChanges();
+
+        Response.Cookies.Append(_refreshCookieName, newRawRefreshToken, AuthCookies.RefreshCookieOptions());
+
+        var newAccess = _tokenProvider.Create(stored.User);
+        return Ok(newAccess);
+    }
+
+    [HttpPost("logout")]
+    [Authorize]
+    public async Task<IActionResult> Logout()
+    {
+        if (Request.Cookies.TryGetValue(_refreshCookieName, out var rawToken) && !string.IsNullOrEmpty(rawToken))
+        {
+            var hash = TokenProvider.Hash(rawToken);
+            var stored = _context.RefreshTokens
+                .FirstOrDefault(t => t.TokenHash == hash);
+
+            if (stored is not null)
+            {
+                stored.RevokedAt = DateTime.UtcNow;
+                _context.SaveChanges();
+            }
+        }
+
+        Response.Cookies.Delete(_refreshCookieName, AuthCookies.RefreshCookieOptions());
+        return Ok();
     }
 
     [HttpPost("create-admin")]

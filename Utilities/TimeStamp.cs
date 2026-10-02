@@ -1,8 +1,6 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿namespace DiscordBotApi.Utilities;
 
-namespace DiscordBotApi.Utilities;
-
-public struct TimeStamp : IEquatable<TimeStamp>
+public class TimeStamp : IEquatable<TimeStamp>
 {
     public int Hours { get; set; }
     public int Minutes { get; set; }
@@ -10,8 +8,17 @@ public struct TimeStamp : IEquatable<TimeStamp>
     public int Miliseconds { get; set; }
     public bool IsTillTheEnd { get; set; }
 
-    public readonly bool Equals(TimeStamp other)
+    public long TotalMilliseconds =>
+        (long)Hours * 3_600_000 +
+        (long)Minutes * 60_000 +
+        (long)Seconds * 1_000 +
+        Miliseconds;
+
+    public bool Equals(TimeStamp? other)
     {
+        if (other is null)
+            return false;
+
         return Hours == other.Hours
             && Minutes == other.Minutes
             && Seconds == other.Minutes
@@ -19,7 +26,7 @@ public struct TimeStamp : IEquatable<TimeStamp>
             && IsTillTheEnd == other.IsTillTheEnd;
     }
 
-    public override readonly bool Equals(object? obj)
+    public override bool Equals(object? obj)
     {
         if (obj == null || obj is not TimeStamp ts)
             return false;
@@ -27,12 +34,12 @@ public struct TimeStamp : IEquatable<TimeStamp>
         return Equals(ts);
     }
 
-    public override readonly int GetHashCode()
+    public override int GetHashCode()
     {
         return HashCode.Combine(Hours, Minutes, Seconds, Miliseconds, IsTillTheEnd);
     }
 
-    public override readonly string ToString()
+    public override string ToString()
     {
         if (IsTillTheEnd)
         {

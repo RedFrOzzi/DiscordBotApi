@@ -36,18 +36,18 @@ public partial class AudioFilesService()
         if (freeSpace < _reservedFreeSpace)
             return new BadRequesError("Не достаточно место на диске");
 
-        var directory = Path.Combine(_basePath, guildId.ToString());
-
-        if (!Directory.Exists(directory))
-            Directory.CreateDirectory(directory);
-
         if (dbContext.AudioTracks.Any(t => t.Guild.Id == guildId && t.Title == title))
             return new AlreadyExistError();
 
         var guild = dbContext.Guilds.FirstOrDefault(g => g.Id == guildId);
         if (guild == null)
             return new BadRequesError("Гильдия не найдена в базе данных");
-        ;
+
+        var directory = Path.Combine(_basePath, guildId.ToString());
+
+        if (!Directory.Exists(directory))
+            Directory.CreateDirectory(directory);
+
         string filePath = Path.Combine(directory, title + ".mp3");
         TimeZoneInfo moscowZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
         DateTime moscowTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, moscowZone);
@@ -93,18 +93,18 @@ public partial class AudioFilesService()
         if (freeSpace < _reservedFreeSpace)
             return new BadRequesError("Не достаточно место на диске");
 
-        var directory = Path.Combine(_basePath, guildId.ToString());
-
-        if (!Directory.Exists(directory))
-            Directory.CreateDirectory(directory);
-
         if (dbContext.AudioTracks.Any(t => t.Title == title))
             return new AlreadyExistError();
 
         var guild = dbContext.Guilds.FirstOrDefault(g => g.Id == guildId);
         if (guild == null)
             return new BadRequesError("Гильдия не найдена в базе данных");
-        ;
+
+        var directory = Path.Combine(_basePath, guildId.ToString());
+
+        if (!Directory.Exists(directory))
+            Directory.CreateDirectory(directory);
+
         string filePath = Path.Combine(directory, title + ".mp3");
         TimeZoneInfo moscowZone = TimeZoneInfo.FindSystemTimeZoneById("Russian Standard Time");
         DateTime moscowTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, moscowZone);

@@ -1,6 +1,6 @@
 ﻿using DiscordBotApi.Utilities;
 
-namespace DiscordBotApi.Data.YtAudioExtractorData;
+namespace DiscordBotApi.Data.YtAudioExtractorDatas;
 
 public class YtAudioExtractorData
 {
