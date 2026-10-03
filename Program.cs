@@ -143,6 +143,8 @@ try
 
     app.UseExceptionHandler();
 
+    app.UsePathBase("/api");
+
     app.MapOpenApi();
     app.MapScalarApiReference();
 
