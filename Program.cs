@@ -8,7 +8,6 @@ using dotenv.net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using NetCord;
 using NetCord.Hosting.Gateway;
@@ -46,16 +45,27 @@ try
     if (!string.IsNullOrWhiteSpace(voiceDisconnectDelayString)
         && int.TryParse(voiceDisconnectDelayString, out voiceDisconnectDelay))
 
-    builder.Services.AddCors(options =>
-    {
-        options.AddDefaultPolicy(policy =>
-        {
-            policy.AllowAnyOrigin()
-            .AllowAnyHeader()
-            .AllowAnyMethod();
-            //.AllowCredentials();
-        });
-    });
+    //builder.Services.AddCors(options =>
+    //{
+    //    options.AddDefaultPolicy(policy =>
+    //    {
+    //        policy.AllowAnyOrigin()
+    //        .AllowAnyHeader()
+    //        .AllowAnyMethod();
+    //        //.AllowCredentials();
+    //    });
+    //});
+
+    //builder.Services.AddCors(options =>
+    //{
+    //    options.AddPolicy("AllowAllWithCredentials", policy =>
+    //    {
+    //        policy.SetIsOriginAllowed(origin => true)
+    //                .AllowAnyHeader()
+    //                .AllowAnyMethod()
+    //                .AllowCredentials();
+    //    });
+    //});
 
     builder.Services.AddControllers();
     builder.Services.AddOpenApi(options =>
@@ -138,7 +148,8 @@ try
 
     app.UseRouting();
 
-    app.UseCors();
+    //app.UseCors();
+    //app.UseCors("AllowAllWithCredentials");
 
     app.MapControllers();
 

@@ -14,7 +14,7 @@ using YoutubeDLSharp;
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
-//[Authorize(Roles = "Admin, Moderator")]
+[Authorize(Roles = "Admin, Moderator")]
 [Route("yt-extractor")]
 public partial class YtAudioExtractorController(
     YtAudioExtractorService ytAudioExtractorService,
@@ -27,11 +27,9 @@ public partial class YtAudioExtractorController(
     const string _checkExtractionStatusEndpoint = "check-extraction";
     const string _getExtractedAudioEndpoint = "get-extracted";
     readonly static string _basePath = Path.Combine(AppContext.BaseDirectory, "DataStorage");
-    readonly static string _audioExtractionDirectory = Environment.GetEnvironmentVariable("AUDIO_EXTRACTION_DIRECTORY_PATH") ?? AppContext.BaseDirectory;
-    readonly static string _checkStatusUrl = GetCheckStatusUrl(Environment.GetEnvironmentVariable("API_BASE_ROUTE")
-        ?? string.Empty, $"yt-extractor/{_checkExtractionStatusEndpoint}");
-    readonly static string _getExtractedAudioUrl = GetCheckStatusUrl(Environment.GetEnvironmentVariable("API_BASE_ROUTE")
-        ?? string.Empty, $"yt-extractor/{_getExtractedAudioEndpoint}");
+    readonly static string _audioExtractionDirectory = Path.Combine(Path.Combine(AppContext.BaseDirectory, "DataStorage"), "TempAudio");
+    readonly static string _checkStatusUrl = $"yt-extractor/{_checkExtractionStatusEndpoint}";
+    readonly static string _getExtractedAudioUrl = $"yt-extractor/{_getExtractedAudioEndpoint}";
     const long _reservedFreeSpace = 536900000; //0.5 gb
     const int _maxTitleLength = 79;
 
@@ -376,6 +374,9 @@ public partial class YtAudioExtractorController(
 
         try
         {
+            if (!Directory.Exists(directoryPath))
+                Directory.CreateDirectory(directoryPath);
+
             var res = await extractor.DownloadAudioFragmentAsync(
                 dto.Url, dto.StartsAt, dto.EndsAt, rndName, directoryPath);
 

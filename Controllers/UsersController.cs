@@ -5,6 +5,8 @@ using DiscordBotApi.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace DiscordBotApi.Controllers;
 
@@ -135,6 +137,7 @@ public class UsersController(
 
     [HttpPost("logout")]
     [Authorize]
+    [ProducesResponseType(200)]
     public async Task<IActionResult> Logout()
     {
         if (Request.Cookies.TryGetValue(_refreshCookieName, out var rawToken) && !string.IsNullOrEmpty(rawToken))
@@ -151,6 +154,34 @@ public class UsersController(
         }
 
         Response.Cookies.Delete(_refreshCookieName, AuthCookies.RefreshCookieOptions());
+        return Ok();
+    }
+
+    [HttpPost("link-user")]
+    [Authorize(Roles = "Admin, Moderator")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> LinkAccount([FromBody] ApiUserLinkDto apiUserLinkDto)
+    {
+        if (apiUserLinkDto.ApiUserId is null
+            || apiUserLinkDto.DiscordUserId is null)
+            return BadRequest("Incorrect data");
+
+        var discordUser = _context.DiscordUsers.FirstOrDefault(u => u.Id == apiUserLinkDto.DiscordUserId);
+        if (discordUser is null)
+            return NotFound("No discord users with this id");
+
+        var apiUser = _context.ApiUsers.FirstOrDefault(u => u.Id == apiUserLinkDto.ApiUserId);
+        if (apiUser is null)
+            return NotFound("No users with this id");
+
+        apiUser.DiscordUser = discordUser;
+        if (_context.SaveChanges() == 0)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
         return Ok();
     }
 
@@ -181,7 +212,10 @@ public class UsersController(
             return StatusCode(StatusCodes.Status500InternalServerError);
         }
 
-        var authorizedUser = _context.ApiUsers.AsNoTracking().FirstOrDefault(u => u.Login == apiUserAddAdminDto.Login);
+        var authorizedUser = _context.ApiUsers
+            .AsNoTracking()
+            .FirstOrDefault(u => u.Login == apiUserAddAdminDto.Login);
+
         var newAdminUser = _context.ApiUsers.FirstOrDefault(u => u.Login == apiUserAddAdminDto.NewAdminLogin);
 
         if (authorizedUser == null)
@@ -225,7 +259,10 @@ public class UsersController(
             });
         }
 
-        var authorizedUser = _context.ApiUsers.AsNoTracking().FirstOrDefault(u => u.Login == apiUserAddModDto.Login);
+        var authorizedUser = _context.ApiUsers
+            .AsNoTracking()
+            .FirstOrDefault(u => u.Login == apiUserAddModDto.Login);
+
         var newModeratorUser = _context.ApiUsers.FirstOrDefault(u => u.Login == apiUserAddModDto.NewModeratorLogin);
 
         if (authorizedUser == null)

@@ -16,8 +16,8 @@ public class DiscordChannelsController(ApplicationDbContext context, GatewayClie
     readonly ApplicationDbContext _context = context;
     readonly GatewayClient _client = client;
 
-    [HttpGet("saved-channels")]
-    [ProducesResponseType(200)]
+    [HttpGet("db-channels")]
+    [ProducesResponseType<List<DiscordChannelGetDto>>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetChannels()
     {

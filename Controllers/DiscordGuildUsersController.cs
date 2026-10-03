@@ -40,7 +40,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     }
 
     [HttpGet("user-from-discord")]
-    [ProducesResponseType(200, Type = typeof(DiscordUserGetDto))]
+    [ProducesResponseType<DiscordUserGetDto>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetGuildUserFromDiscord([FromQuery] ulong guildId, [FromQuery] string username, CancellationToken cancellationToken)
     {
@@ -108,7 +108,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     }
 
     [HttpGet("users-from-db")]
-    [ProducesResponseType(200)]
+    [ProducesResponseType<List<DiscordUserGetDto>>(200)]
     [ProducesResponseType(404)]
     [ProducesResponseType(500)]
     public async Task<IActionResult> GetUsersFromDb()
@@ -121,6 +121,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
                     Username = user.Username,
                     Nickname = user.Nickname,
                     GlobalName = user.GlobalName,
+                    GuildIds = user.Guilds.Select(x => x.Id).ToArray(),
                     ImageURL = user.ImageURL,
                     UserResource = user.UserSpendingResource,
                 })
@@ -152,7 +153,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     [HttpPatch("change-user-resource")]
     [ProducesResponseType(200)]
     [ProducesResponseType(500)]
-    public IActionResult GiveUserIqPoints([FromQuery] ulong userId, [FromQuery] int resourcePointsChange, CancellationToken cancellationToken)
+    public IActionResult GiveUserIqPoints([FromQuery] ulong userId, [FromQuery] int resourcePointsChange)
     {
         var user = _context.DiscordUsers.FirstOrDefault(u => u.Id == userId);
         if (user == null)
