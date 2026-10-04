@@ -15,7 +15,7 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
 
     //------------------------------------------------------SEND-MESSAGES-------------------------------------------------------------------------------------------------------------
 
-    [HttpPost("send-props")]
+    [HttpPost("send-reply")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(500)]
@@ -47,6 +47,29 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError);
 
         await _client.Rest.SendMessageAsync(channelId, message, cancellationToken: cancellationToken);
+
+        return Ok();
+    }
+
+    [HttpPost("send-voice-message")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> SendVoiceMessage([FromQuery] ulong channelId, [FromBody] string message, CancellationToken cancellationToken)
+    {
+        if (channelId <= 1 || string.IsNullOrWhiteSpace(message))
+            return BadRequest("Parameters error");
+
+        if (_client == null)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
+        MessageProperties mProps = new()
+        {
+            Content = message,
+            Tts = true,
+        };
+
+        await _client.Rest.SendMessageAsync(channelId, mProps, cancellationToken: cancellationToken);
 
         return Ok();
     }

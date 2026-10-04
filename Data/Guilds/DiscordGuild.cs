@@ -12,4 +12,5 @@ public class DiscordGuild
     [Required] public DiscordUser Owner { get; set; } = null!;
     public ICollection<DiscordUser> Users { get; set; } = [];
     public ICollection<DiscordChannel> Channels { get; set; } = [];
+    public string? IconUrl { get; set; }
 }

@@ -7,4 +7,5 @@ public class DiscordGuildGetDto
     public string? OwnerId { get; set; }
     public ICollection<string>? UserIds { get; set; }
     public ICollection<string>? ChannelIds { get; set; }
+    public string? IconUrl { get; set; }
 }

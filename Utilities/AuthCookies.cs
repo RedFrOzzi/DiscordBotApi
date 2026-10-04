@@ -7,7 +7,7 @@ public static class AuthCookies
         HttpOnly = true,
         Secure = true,
         SameSite = SameSiteMode.Strict,
-        Path = "/users",
+        Path = "/api",
         Expires = expires
     };
 }

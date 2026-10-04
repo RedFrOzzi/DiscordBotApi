@@ -10,7 +10,7 @@ public class DiscordUserGetDto
     public string? Nickname { get; set; } = string.Empty;
     public string? GlobalName { get; set; } = string.Empty;
     public string? ImageURL { get; set; } = string.Empty;
-    public ulong[] GuildIds { get; set; } = [];
+    public string[] GuildIds { get; set; } = [];
     public VoiceStateDto? VoiceState { get; set; }
     public int UserResource { get; set; }
 

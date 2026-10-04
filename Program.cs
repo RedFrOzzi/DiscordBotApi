@@ -3,6 +3,7 @@ using DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Middlewares;
 using DiscordBotApi.Services;
+using DiscordBotApi.Services.GuildUpdater;
 using DiscordBotApi.Utilities;
 using dotenv.net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -44,17 +45,6 @@ try
     int voiceDisconnectDelay = 120;
     if (!string.IsNullOrWhiteSpace(voiceDisconnectDelayString)
         && int.TryParse(voiceDisconnectDelayString, out voiceDisconnectDelay))
-
-    //builder.Services.AddCors(options =>
-    //{
-    //    options.AddDefaultPolicy(policy =>
-    //    {
-    //        policy.AllowAnyOrigin()
-    //        .AllowAnyHeader()
-    //        .AllowAnyMethod();
-    //        //.AllowCredentials();
-    //    });
-    //});
 
     //builder.Services.AddCors(options =>
     //{
@@ -109,6 +99,11 @@ try
         return new AsyncTimersCollection(voiceDisconnectDelay, lifetime);
     });
 
+    //Guild Update Services
+    builder.Services.AddSingleton<GuildUpdateQueue>();
+    builder.Services.AddScoped<IGuildUpdateProcessor, GuildUpdateProcessor>();
+    builder.Services.AddHostedService<GuildUpdateBackgroundService>();
+
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
@@ -150,7 +145,6 @@ try
 
     app.UseRouting();
 
-    //app.UseCors();
     //app.UseCors("AllowAllWithCredentials");
 
     app.MapControllers();

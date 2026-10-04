@@ -121,7 +121,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
                     Username = user.Username,
                     Nickname = user.Nickname,
                     GlobalName = user.GlobalName,
-                    GuildIds = user.Guilds.Select(x => x.Id).ToArray(),
+                    GuildIds = user.Guilds.Select(x => x.Id.ToString()).ToArray(),
                     ImageURL = user.ImageURL,
                     UserResource = user.UserSpendingResource,
                 })
