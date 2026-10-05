@@ -12,5 +12,5 @@ public class AudioTrack
     public double? SizeInKb { get; set; }
     public DateTime? CreatedAt { get; set; }
 
-    public void SetSize(long sizeInBytes) => SizeInKb = sizeInBytes / 1024.0;
+    public void SetSize(double sizeInBytes) => SizeInKb = sizeInBytes / 1024.0;
 }

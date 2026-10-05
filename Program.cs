@@ -44,18 +44,20 @@ try
     var voiceDisconnectDelayString = Environment.GetEnvironmentVariable("VOICE_DISCONNECT_DELAY");
     int voiceDisconnectDelay = 120;
     if (!string.IsNullOrWhiteSpace(voiceDisconnectDelayString)
-        && int.TryParse(voiceDisconnectDelayString, out voiceDisconnectDelay))
+        && int.TryParse(voiceDisconnectDelayString, out voiceDisconnectDelay)) { }
 
-    //builder.Services.AddCors(options =>
-    //{
-    //    options.AddPolicy("AllowAllWithCredentials", policy =>
-    //    {
-    //        policy.SetIsOriginAllowed(origin => true)
-    //                .AllowAnyHeader()
-    //                .AllowAnyMethod()
-    //                .AllowCredentials();
-    //    });
-    //});
+#if DEBUG
+    builder.Services.AddCors(options =>
+    {
+        options.AddPolicy("AllowAllWithCredentials", policy =>
+        {
+            policy.SetIsOriginAllowed(origin => true)
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()
+                    .AllowCredentials();
+        });
+    });
+#endif
 
     builder.Services.AddControllers();
     builder.Services.AddOpenApi(options =>
@@ -145,7 +147,9 @@ try
 
     app.UseRouting();
 
-    //app.UseCors("AllowAllWithCredentials");
+#if DEBUG
+    app.UseCors("AllowAllWithCredentials");
+#endif
 
     app.MapControllers();
 

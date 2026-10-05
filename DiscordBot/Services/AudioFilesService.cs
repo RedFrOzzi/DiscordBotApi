@@ -36,7 +36,9 @@ public partial class AudioFilesService()
         if (freeSpace < _reservedFreeSpace)
             return new BadRequesError("Не достаточно место на диске");
 
-        if (dbContext.AudioTracks.Any(t => t.Guild.Id == guildId && t.Title == title))
+        if (dbContext.AudioTracks
+            .Where(t => t.Guild.Id == guildId)
+            .Any(t => t.Guild.Id == guildId && t.Title == title))
             return new AlreadyExistError();
 
         var guild = dbContext.Guilds.FirstOrDefault(g => g.Id == guildId);
@@ -77,7 +79,7 @@ public partial class AudioFilesService()
         return new Success<AudioTrack>("Успех", track);
     }
 
-    public static async Task<Result> TrySaveFile(ApplicationDbContext dbContext, Stream downloadStream, long size, string title, ulong guildId)
+    public static async Task<Result> TrySaveFile(ApplicationDbContext dbContext, Stream downloadStream, double size, string title, ulong guildId)
     {
         if (guildId <= 0)
             return new BadRequesError("Не верно указан канал");
@@ -93,7 +95,9 @@ public partial class AudioFilesService()
         if (freeSpace < _reservedFreeSpace)
             return new BadRequesError("Не достаточно место на диске");
 
-        if (dbContext.AudioTracks.Any(t => t.Title == title))
+        if (dbContext.AudioTracks
+            .Where(t => t.Guild.Id == guildId)
+            .Any(t => t.Title == title))
             return new AlreadyExistError();
 
         var guild = dbContext.Guilds.FirstOrDefault(g => g.Id == guildId);
@@ -176,6 +180,8 @@ public partial class AudioFilesService()
         _titleToPathCollection.TryAdd(title, audioTrack.Path);
         return audioTrack.Path;
     }
+
+    public static bool IsTitleCorrect(string title) => title.Length <= _maxTitleLength && LettersNumbersSymbolsRegex().IsMatch(title);
 
     [GeneratedRegex(@"^[\p{L}\p{N}_*. ,:&?!@#$%()<>-]+$")]
     private static partial Regex LettersNumbersSymbolsRegex();
