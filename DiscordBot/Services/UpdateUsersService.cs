@@ -9,7 +9,7 @@ namespace DiscordBotApi.DiscordBot.Services;
 public class UpdateUsersService(GatewayClient gateway, IServiceScopeFactory factory)
 {
     public bool IsInUpdateState => _isInUpdateState;
-    public int ProcessedPercent => _procecssed;
+    public int ProcessedPercent => GetProgressPercent(_procecssed, _totalUsersToProcess);
 
     readonly GatewayClient _gateway = gateway;
     readonly IServiceScopeFactory _factory = factory;
@@ -18,6 +18,7 @@ public class UpdateUsersService(GatewayClient gateway, IServiceScopeFactory fact
 
     bool _isInUpdateState = false;
     int _procecssed;
+    int _totalUsersToProcess;
 
     /// <summary>
     /// Updates user properties
@@ -78,6 +79,7 @@ public class UpdateUsersService(GatewayClient gateway, IServiceScopeFactory fact
 
             int processed = 0;
             int total = guildUsers.Count;
+            _totalUsersToProcess = total;
 
             foreach (var discordUser in guildUsers)
             {
@@ -99,7 +101,7 @@ public class UpdateUsersService(GatewayClient gateway, IServiceScopeFactory fact
                 processed++;
 
                 // Log progress periodically.
-                if (processed % 10 == 0 || processed == total)
+                if (processed % 2 == 0 || processed == total)
                 {
                     var val = total - processed;
                     Log.Information("Users to update left: {val}", val);
@@ -133,5 +135,11 @@ public class UpdateUsersService(GatewayClient gateway, IServiceScopeFactory fact
             _cts = null;
             _updateLock.Release();
         }
+    }
+
+    private int GetProgressPercent(float processed, float total)
+    {
+        float percent = processed / total * 100f;
+        return (int)MathF.Round(percent, MidpointRounding.ToZero);
     }
 }

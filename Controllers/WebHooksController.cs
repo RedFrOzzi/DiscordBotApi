@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using System.Diagnostics;
 using System.Security.Cryptography;
@@ -51,6 +52,16 @@ public class WebHooksController : ControllerBase
         StartDeploymentScript();
 
         return Ok("Webhook received, deployment started");
+    }
+
+    [HttpPost("update-server")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(200)]
+    public async Task<IActionResult> UpdateServer()
+    {
+        StartDeploymentScript();
+
+        return Ok();
     }
 
     private static bool VerifySignature(string body, string signature, string secret)

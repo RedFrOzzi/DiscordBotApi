@@ -1,12 +1,9 @@
 ﻿using DiscordBotApi.Data.ApiUsers;
-using DiscordBotApi.Data.RefreshTokens;
 using DiscordBotApi.Database;
 using DiscordBotApi.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
 
 namespace DiscordBotApi.Controllers;
 
@@ -158,7 +155,7 @@ public class UsersController(
     }
 
     [HttpPost("link-user")]
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(401)]

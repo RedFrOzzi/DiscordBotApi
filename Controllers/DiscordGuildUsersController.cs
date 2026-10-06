@@ -11,7 +11,6 @@ namespace DiscordBotApi.Controllers;
 
 [ApiController]
 [Route("guild-users")]
-[Authorize(Roles = "Admin, Moderator")]
 public class DiscordGuildUsersController(GatewayClient client, ApplicationDbContext context, UpdateUsersService updateService) : ControllerBase
 {
     readonly GatewayClient _client = client;
@@ -19,6 +18,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     readonly UpdateUsersService _updateService = updateService;
 
     [HttpGet("users-from-discord")]
+    [Authorize(Roles = "Admin, Moderator")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetGuildUsersFromDiscord([FromQuery] ulong guildId, CancellationToken cancellationToken)
@@ -40,6 +40,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     }
 
     [HttpGet("user-from-discord")]
+    [Authorize(Roles = "Admin, Moderator")]
     [ProducesResponseType<DiscordUserGetDto>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetGuildUserFromDiscord([FromQuery] ulong guildId, [FromQuery] string username, CancellationToken cancellationToken)
@@ -74,6 +75,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     }
 
     [HttpGet("user-by-id-from-discord")]
+    [Authorize(Roles = "Admin, Moderator")]
     [ProducesResponseType(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetGuildUserStateFromDiscord([FromQuery] ulong guildId, [FromQuery] ulong userId, CancellationToken cancellationToken)
@@ -108,6 +110,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     }
 
     [HttpGet("users-from-db")]
+    [Authorize(Roles = "Admin, Moderator")]
     [ProducesResponseType<List<DiscordUserGetDto>>(200)]
     [ProducesResponseType(404)]
     [ProducesResponseType(500)]
@@ -136,13 +139,14 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     }
 
     [HttpGet("update-progress")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(200)]
-    [ProducesResponseType(404)]
+    [ProducesResponseType(400)]
     [ProducesResponseType(500)]
-    public async Task<IActionResult> GetUsersUpdateProgress(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetUsersUpdateProgress()
     {
         if (_updateService == null)
-            return NotFound();
+            return StatusCode(StatusCodes.Status500InternalServerError);
 
         if (!_updateService.IsInUpdateState)
             return BadRequest("Update is not running");
@@ -151,6 +155,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     }
 
     [HttpPatch("change-user-resource")]
+    [Authorize(Roles = "Admin, Moderator")]
     [ProducesResponseType(200)]
     [ProducesResponseType(500)]
     public IActionResult GiveUserIqPoints([FromQuery] ulong userId, [FromQuery] int resourcePointsChange)
@@ -175,13 +180,18 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     }
 
     [HttpPatch("update-users")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
+    [ProducesResponseType(409)]
     [ProducesResponseType(500)]
-    public IActionResult UpdateUsersInDatabase([FromQuery] ulong guildId, CancellationToken cancellationToken)
+    public IActionResult UpdateUsersInDatabase([FromQuery] ulong guildId)
     {
         if (guildId <= 0)
             return BadRequest("guild id was not provided");
+
+        if (_updateService.IsInUpdateState)
+            return Conflict("Already in progress");
 
         _updateService.BeginUpdate(guildId);
 
@@ -189,6 +199,7 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
     }
 
     [HttpPatch("cancel-update-users")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(200)]
     [ProducesResponseType(500)]
     public IActionResult CancelUpdateUsersInDatabase()
