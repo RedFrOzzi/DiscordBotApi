@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using NetCord;
 using NetCord.Gateway.Voice;
 using NetCord.Rest;
-using NetCord.Services;
 using NetCord.Services.ComponentInteractions;
 using Serilog;
 using System.Diagnostics;
@@ -18,7 +17,7 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
     readonly ApplicationDbContext _dbContext = dbContext;
     readonly VoiceInstancesContainer _voiceInstancesContainer = voiceInstancesContainer;
     readonly AsyncTimersCollection _timers = timers;
-    readonly string _ffmpegPath = Environment.GetEnvironmentVariable("FFMPEG_FILE_PATH") ?? "ffmpeg";
+    readonly static string _ffmpegPath = Environment.GetEnvironmentVariable("FFMPEG_FILE_PATH") ?? "ffmpeg";
 
     [ComponentInteraction(VoiceConnectionConstants.VoicePanelButtonId)]
     public async Task HandleAudioButton(string title)
@@ -178,7 +177,7 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
             await FollowupAsync(new() { Content = "Бот не в голосовом чате.", Flags = MessageFlags.Ephemeral });
             return;
         }
-        //guild.VoiceStates.TryGetValue(Context.Interaction.ApplicationId, out var botState)
+
         if (userState.ChannelId != botVoiceState.ChannelId)
         {
             await FollowupAsync(new() { Content = "Пользователь не в том голосовом канале.", Flags = MessageFlags.Ephemeral });

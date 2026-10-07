@@ -138,6 +138,47 @@ public class DiscordGuildUsersController(GatewayClient client, ApplicationDbCont
         return Ok(users);
     }
 
+    [HttpGet("users-voice-states")]
+    [Authorize(Roles = "Admin, Moderator")]
+    [ProducesResponseType<List<DiscordUserGetVoiceStateDto>>(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetUsersVoiceStates([FromQuery] string guildId)
+    {
+        if (string.IsNullOrWhiteSpace(guildId)
+            || !ulong.TryParse(guildId, out var id))
+            return BadRequest("Wrong data provided");
+
+        var dbGuild = _context.Guilds
+            .AsNoTracking()
+            .FirstOrDefault(g => g.Id == id);
+
+        if (dbGuild == null)
+            return NotFound("Guild not found");
+
+        if (!_client.Cache.Guilds.TryGetValue(id, out var guild))
+            return NotFound("Guild not found in cache");
+
+        List<DiscordUserGetVoiceStateDto> res = [];
+
+        if (guild.VoiceStates is null || guild.VoiceStates.Count == 0)
+            return NotFound("Nobody in voice channels");
+
+        foreach (var pair in guild.VoiceStates)
+        {
+            var state = pair.Value;
+            res.Add(new DiscordUserGetVoiceStateDto()
+            {
+                UserId = pair.Key.ToString(),
+                ChannelId = state.ChannelId?.ToString(),
+                IsMuted = state.IsMuted || state.IsSelfMuted,
+                IsDeafened = state.IsDeafened || state.IsSelfDeafened,
+            });
+        }
+
+        return Ok(res);
+    }
+
     [HttpGet("update-progress")]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(200)]

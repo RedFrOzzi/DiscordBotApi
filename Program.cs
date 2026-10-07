@@ -91,6 +91,7 @@ try
         .AddComponentInteractions<ModalInteraction, ModalInteractionContext>();
 
     builder.Services.AddScoped<YtAudioExtractorService>();
+    builder.Services.AddScoped<TextToSpeechService>();
     builder.Services.AddSingleton<UpdateUsersService>();
     builder.Services.AddSingleton<PasswordHasher>();
     builder.Services.AddSingleton<TokenProvider>();

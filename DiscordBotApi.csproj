@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <PackageReference Include="dotenv.net" Version="4.0.2" />
+    <PackageReference Include="edge-tts-net" Version="2.0.0" />
     <PackageReference Include="EFCore.BulkExtensions.Sqlite" Version="10.0.1" />
     <PackageReference Include="libsodium" Version="1.0.22" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />

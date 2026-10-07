@@ -1,17 +1,31 @@
 ﻿using DiscordBotApi.Data.Messages;
+using DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
+using DiscordBotApi.Services;
+using edge_tts_net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NetCord.Gateway;
+using NetCord.Gateway.Voice;
 using NetCord.Rest;
+using Serilog;
+using System.Security.Claims;
 
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
 [Route("bot-messages")]
 [Authorize(Roles = "Admin, Moderator")]
-public class BotMessagesController(GatewayClient client) : ControllerBase
+public class BotMessagesController(
+    GatewayClient client,
+    VoiceInstancesContainer voiceInstancesContainer,
+    IServiceScopeFactory scopeFactory,
+    IHostApplicationLifetime lifetime) : ControllerBase
 {
     readonly GatewayClient _client = client;
+    readonly VoiceInstancesContainer _voiceInstancesContainer = voiceInstancesContainer;
+    readonly IServiceScopeFactory _scopeFactory = scopeFactory;
+    readonly IHostApplicationLifetime _lifetime = lifetime;
+    readonly static string _ffmpegPath = Environment.GetEnvironmentVariable("FFMPEG_FILE_PATH") ?? "ffmpeg";
 
     //------------------------------------------------------SEND-MESSAGES-------------------------------------------------------------------------------------------------------------
 
@@ -91,6 +105,117 @@ public class BotMessagesController(GatewayClient client) : ControllerBase
         mProps.AddEmbeds(dto);
 
         await _client.Rest.SendMessageAsync(channelId, mProps, cancellationToken: cancellationToken);
+
+        return Ok();
+    }
+
+    [HttpPost("stream-voice")]
+    [ProducesResponseType(202)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> StreamVoice([FromBody] StreamVoiceDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Message))
+            return BadRequest(new 
+            {
+                key = "message",
+                message = "Message is required."
+            });
+
+        if (dto.GuildId == 0)
+            return BadRequest(new
+            {
+                key = "guild",
+                message = "GuildId are required."
+            });
+
+        var message = dto.Message;
+        var options = dto.Options ?? TTSOption.Default;
+        var guildId = dto.GuildId;
+        var shutdownToken = _lifetime.ApplicationStopping;
+
+        if (!_voiceInstancesContainer.VoiceInstances.ContainsKey(guildId))
+        {
+            return BadRequest(new {
+                key = "bot",
+                message = "Bot is not in voice channel"
+            });
+        }
+
+        _ = Task.Run(async () =>
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var sp = scope.ServiceProvider;
+
+            var gatewayClient = sp.GetRequiredService<GatewayClient>();
+            var voiceContainer = sp.GetRequiredService<VoiceInstancesContainer>();
+            var streamer = sp.GetRequiredService<TextToSpeechService>();
+
+            try
+            {
+                if (!voiceContainer.VoiceInstances.TryGetValue(guildId, out var voiceInstance) || voiceInstance is null)
+                {
+                    Log.Error("User with id: {0} invoke audio play, but bot was not connected", User.FindFirstValue(ClaimTypes.NameIdentifier));
+                    return;
+                }
+
+                // Take a playback job
+                using var job = voiceInstance.TryEnterJob(VoiceJobType.Playing);
+                if (job is not { CancellationToken: var jobToken })
+                    return;
+
+                // Link job cancellation with app shutdown
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                    shutdownToken, jobToken);
+
+                var voiceClient = voiceInstance.Client;
+
+                await streamer.StreamTtsToDiscordAsync(
+                    message,
+                    options,
+                    voiceClient,
+                    _ffmpegPath,
+                    linked.Token);
+            }
+            catch (OperationCanceledException) when (shutdownToken.IsCancellationRequested)
+            {
+                // App is shutting down
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Voice streaming failed for guild {GuildId}", guildId);
+            }
+        });
+
+        return Accepted();
+    }
+
+    [HttpPost("stop-voice-stream")]
+    public IActionResult StopVoice([FromBody] string guildId)
+    {
+        if (string.IsNullOrWhiteSpace(guildId)
+            || !ulong.TryParse(guildId, out var id)
+            || id <= 1)
+            return BadRequest(new 
+            {   key = "guild",
+                message = "GuildId is required."
+            });
+
+        if (!_voiceInstancesContainer.VoiceInstances.TryGetValue(id, out var instance)
+            || instance is null)
+        {
+            return NotFound(new 
+            {
+                key = "bot",
+                message = "Bot is not in a voice channel in this guild."
+            });
+        }
+
+        if (!instance.StopPlaying())
+            return NotFound(new 
+            {
+                key = "stream",
+                error = "Nothing is playing in this guild." 
+            });
 
         return Ok();
     }

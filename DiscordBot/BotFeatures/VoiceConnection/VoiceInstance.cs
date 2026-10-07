@@ -5,6 +5,8 @@ namespace DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 public sealed class VoiceInstance(VoiceClient client) : IDisposable
 {
     public VoiceClient Client => client;
+    public bool IsPlaying =>
+    Volatile.Read(ref _jobStatuses[(int)VoiceJobType.Playing]) == 1;
 
     static readonly int _jobTypeCount = Enum.GetValues<VoiceJobType>().Length;
     CancellationTokenSource _cancellationTokenSource = new();
@@ -25,17 +27,18 @@ public sealed class VoiceInstance(VoiceClient client) : IDisposable
         }
     }
 
-    public void StopPlaying()
+    public bool StopPlaying()
     {
         lock (_lock)
         {
             if (Interlocked.CompareExchange(ref _jobStatuses[(int)VoiceJobType.Playing], 0, 1) != 1)
-                return;
+                return false;
 
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();
 
             _cancellationTokenSource = new CancellationTokenSource();
+            return true;
         }
     }
 
