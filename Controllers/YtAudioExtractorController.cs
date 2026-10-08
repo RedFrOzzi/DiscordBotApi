@@ -7,7 +7,9 @@ using DiscordBotApi.Utilities.Result;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using NetCord.Gateway;
 using Serilog;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using YoutubeDLSharp;
 
@@ -349,6 +351,80 @@ public partial class YtAudioExtractorController(
         }
 
         return Created();
+    }
+
+    [HttpPost("create-fragment")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(409)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> CreateAudioFragment([FromForm] AudioEditDto audioTrackDto)
+    {
+        if (string.IsNullOrWhiteSpace(audioTrackDto.Title)
+            || audioTrackDto.StartsAt.Equals(audioTrackDto.EndsAt)
+            || audioTrackDto.StartsAt > audioTrackDto.EndsAt
+            || audioTrackDto.OperationId == Guid.Empty)
+        {
+            return BadRequest("Incorrect data");
+        }
+
+        if (audioTrackDto.Title.Length > _maxTitleLength || !LettersNumbersSymbolsRegex().IsMatch(audioTrackDto.Title))
+            return BadRequest("Incorrect format of Title");
+
+        var state = _dbContext.AudioExtractionState
+            .AsNoTracking()
+            .FirstOrDefault(s => s.RequestId == audioTrackDto.OperationId);
+
+        if (state == null)
+            return Problem("Operation with this id was not found", HttpContext.Request.Path, StatusCodes.Status404NotFound);
+
+        if (!string.Equals(state.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
+            return Problem("Operation is not marked as succeeded", HttpContext.Request.Path, StatusCodes.Status400BadRequest);
+
+        var audioInputPath = Path.Combine(_audioExtractionDirectory, $"{state.Name}.mp3");
+
+        if (!System.IO.File.Exists(audioInputPath))
+            return Problem("Input file was not found", HttpContext.Request.Path, StatusCodes.Status404NotFound);
+
+        string fileOutputPath = Path.Combine(_audioExtractionDirectory, $"{audioTrackDto.Title}.mp3");
+        var start = TimeSpan.FromMilliseconds(audioTrackDto.StartsAt.TotalMilliseconds);
+        TimeSpan? end = audioTrackDto.EndsAt.IsTillTheEnd
+        ? null
+        : TimeSpan.FromMilliseconds(audioTrackDto.EndsAt.TotalMilliseconds);
+
+        try
+        {
+            var res = await _ytAudioExtractor.CutAndSaveAudioAsync(audioInputPath, fileOutputPath, start, end);
+            if (res is Error error)
+            {
+                Log.Error("Audio extraction failed with message: {0}", error.Message);
+                return StatusCode(StatusCodes.Status500InternalServerError, error.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Audio extraction failed with message: {0}", ex.Message);
+            return StatusCode(StatusCodes.Status500InternalServerError, "Audio processing failed");
+        }
+
+        if (!System.IO.File.Exists(fileOutputPath))
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to save file");
+        }
+
+        try
+        {
+            System.IO.File.Delete(audioInputPath);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error while trying to delete input file");
+        }
+
+        var stream = System.IO.File.OpenRead(fileOutputPath);
+        return File(stream, "audio/mpeg", fileDownloadName: $"{state.Name}.mp3", enableRangeProcessing: true);
     }
 
 
