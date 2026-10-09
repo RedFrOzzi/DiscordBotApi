@@ -84,6 +84,11 @@ public class YtAudioExtractorService
             options.AddCustomOption<string>("--js-runtimes", $"deno:{_denoPath}");
         }
 
+        if (!string.IsNullOrWhiteSpace(_cookiesPath) && File.Exists(_cookiesPath))
+        {
+            options.AddCustomOption<string>("--cookies", _cookiesPath);
+        }
+
         options.ExtractAudio = true;
         options.AudioFormat = AudioConversionFormat.Mp3;
         options.Output = path;
