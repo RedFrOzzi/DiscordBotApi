@@ -13,6 +13,7 @@ public class YtAudioExtractorService
     private readonly YoutubeDL _ytdl;
     readonly string? _denoPath;
     readonly string? _ffmpegPath;
+    readonly string? _cookiesPath;
     readonly Option<bool> _forceKeyframesOption;
 
     public YtAudioExtractorService()
@@ -34,6 +35,12 @@ public class YtAudioExtractorService
 
         _denoPath = Environment.GetEnvironmentVariable("DENO_FILE_PATH");
 
+        _cookiesPath = Path.Combine(AppContext.BaseDirectory, "cookies.txt");
+        if (!File.Exists(_cookiesPath))
+        {
+            _cookiesPath = Environment.GetEnvironmentVariable("YT_COOKIES_FULL_PATH");
+        }
+
         _forceKeyframesOption = new Option<bool>(true, "--force-keyframes-at-cuts")
         {
             Value = true
@@ -48,6 +55,11 @@ public class YtAudioExtractorService
         if (_denoPath != null)
         {
             options.AddCustomOption<string>("--js-runtimes", $"deno:{_denoPath}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_cookiesPath) && File.Exists(_cookiesPath))
+        {
+            options.AddCustomOption<string>("--cookies", _cookiesPath);
         }
 
         options.ExtractAudio = true;
