@@ -19,7 +19,8 @@ namespace DiscordBotApi.Utilities
             var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));
             var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-            List<Claim> claims = [new Claim(JwtRegisteredClaimNames.Sub, apiUser.Id.ToString())];
+            List<Claim> claims = [new Claim(JwtRegisteredClaimNames.Sub, apiUser.Key.ToString())];
+
             if (apiUser.IsAdmin)
                 claims.Add(new(ClaimTypes.Role, "Admin"));
 

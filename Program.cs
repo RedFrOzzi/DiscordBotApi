@@ -18,7 +18,9 @@ using NetCord.Hosting.Services.ComponentInteractions;
 using NetCord.Services.ComponentInteractions;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Templates;
 using System.Net;
+using System.Security.Claims;
 using System.Text;
 
 Log.Logger = new LoggerConfiguration()
@@ -29,16 +31,29 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
+    DotEnv.Load();
+
+    var logsPath = Environment.GetEnvironmentVariable("LOGS_PATH") ?? "Logs/app-log-.txt";
+
     Log.Information("Запуск приложения");
 
     var builder = WebApplication.CreateBuilder(args);
 
+    const string tmpl =
+    "[{@t:dd-MM-yyyy HH:mm:ss} {@l:u3}] {@m}" +
+    "{#if ClientIP is not null} ip={ClientIP} userId={UserId} ua=\"{UserAgent}\"{#end}" +
+    "{@x}\n";
+
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
-        .Enrich.FromLogContext());
+        .Enrich.FromLogContext()
+        .WriteTo.File(new ExpressionTemplate(tmpl),
+        path: logsPath,
+        rollingInterval: RollingInterval.Month,
+        retainedFileCountLimit: 5,
+        fileSizeLimitBytes: 5 * 1024 * 1024));
 
-    DotEnv.Load();
     builder.Configuration.AddEnvironmentVariables();
     var securityKey = Environment.GetEnvironmentVariable("SECURITY_KEY") ?? throw new("Security key was null");
     var voiceDisconnectDelayString = Environment.GetEnvironmentVariable("VOICE_DISCONNECT_DELAY");
@@ -127,6 +142,11 @@ try
                 ValidIssuer = builder.Configuration["Jwt:Issuer"],
                 ValidAudience = builder.Configuration["Jwt:Audience"],
                 ClockSkew = TimeSpan.Zero,
+                RoleClaimType = ClaimTypes.Role,
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true
             };
         });
 

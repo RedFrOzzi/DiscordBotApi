@@ -5,13 +5,32 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using static DiscordBotApi.Utilities.LogsParser;
 
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
-[Route("webhooks")]
-public class WebHooksController : ControllerBase
+[Route("managment")]
+public class ManagmentController : ControllerBase
 {
+    readonly string _logsPath;
+
+    public ManagmentController()
+    {
+        var fullPath = Environment.GetEnvironmentVariable("LOGS_PATH");
+        if (!string.IsNullOrWhiteSpace(fullPath))
+        {
+            var k = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrWhiteSpace(k))
+            {
+                _logsPath = k;
+                return;
+            }
+        }
+
+        _logsPath = "Logs";
+    }
+
     [HttpPost("update")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
@@ -62,6 +81,78 @@ public class WebHooksController : ControllerBase
         StartDeploymentScript();
 
         return Ok();
+    }
+
+    [HttpGet("logs")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> GetServerLogs(
+        [FromQuery] string? search,
+        [FromQuery] string? level,
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        [FromQuery] int pageSize = 100,
+        [FromQuery] string? cursor = null)
+    {
+        pageSize = Math.Clamp(pageSize, 1, 500);
+        var offset = Cursor.Decode(cursor);
+
+        var file = Directory.GetFiles(_logsPath, "app-log-*.txt")
+                            .OrderByDescending(System.IO.File.GetLastWriteTimeUtc)
+                            .FirstOrDefault();
+
+        if (file is null) return NotFound(new LogPage([], null, false));
+
+        try
+        {
+            var reader = new LogFileReader(file);
+
+            var hits = new List<LogEntry>();
+            var skipped = 0;
+            var hasMore = false;
+
+            foreach (var entry in reader.ReadBackwards())
+            {
+                if (from is not null && entry.Ts < from)
+                    break;
+
+                if (to is not null && entry.Ts > to)
+                    continue;
+
+                if (!string.IsNullOrEmpty(level) &&
+                    !string.Equals(entry.Level, level, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (!string.IsNullOrEmpty(search) &&
+                    entry.Message.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                if (skipped < offset)
+                {
+                    skipped++;
+                    continue;
+                }
+
+                if (hits.Count < pageSize)
+                {
+                    hits.Add(entry);
+                    continue;
+                }
+
+                hasMore = true;
+                break;
+            }
+
+            var next = hasMore ? Cursor.Encode(offset + hits.Count) : null;
+            return Ok(new LogPage(hits, next, hasMore));
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Error while trying to read logs");
+            return StatusCode(StatusCodes.Status500InternalServerError);
+        }
     }
 
     private static bool VerifySignature(string body, string signature, string secret)
