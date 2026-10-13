@@ -3,23 +3,38 @@ using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 using DiscordBotApi.DiscordBot.Services;
+using DiscordBotApi.Services;
 using DiscordBotApi.Utilities.Result;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using NetCord;
+using NetCord.Gateway;
+using NetCord.Gateway.Voice;
 using NetCord.Rest;
 using Serilog;
+using System.Diagnostics;
+using System.Security.Claims;
 
 namespace DiscordBotApi.Controllers;
 
 [ApiController]
 [Authorize(Roles = "Admin, Moderator")]
 [Route("audio-tracks")]
-public class AudioTracksController(ApplicationDbContext context, RestClient restClient) : ControllerBase
+public class AudioTracksController(
+    ApplicationDbContext context,
+    RestClient restClient,
+    VoiceInstancesContainer voiceInstancesContainer,
+    IServiceScopeFactory serviceScopeFactory,
+    IHostApplicationLifetime hostApplicationLifetime) : ControllerBase
 {
     readonly ApplicationDbContext _dbContext = context;
-    private readonly RestClient _restClient = restClient;
+    readonly RestClient _restClient = restClient;
+    readonly VoiceInstancesContainer _voiceInstancesContainer = voiceInstancesContainer;
+    readonly IServiceScopeFactory _scopeFactory = serviceScopeFactory;
+    readonly IHostApplicationLifetime _applicationLifetime = hostApplicationLifetime;
+    readonly static string _ffmpegPath = Environment.GetEnvironmentVariable("FFMPEG_FILE_PATH") ?? "ffmpeg";
 
     [HttpPost("upload")]
     [Consumes("multipart/form-data")]
@@ -243,6 +258,124 @@ public class AudioTracksController(ApplicationDbContext context, RestClient rest
             InternalError => StatusCode(StatusCodes.Status500InternalServerError),
             _ => Ok()
         };
+    }
+
+    [HttpPost("{key:int}/play")]
+    [ProducesResponseType(202)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> PlayAudioTrack(int key, [FromQuery] ulong guildId)
+    {
+        if (key < 0 || guildId <= 0)
+            return BadRequest("Invalid data");
+
+        var track = _dbContext.AudioTracks
+           .AsNoTracking()
+           .Where(t => t.Guild.Id == guildId)
+           .FirstOrDefault(t => t.Key == key);
+
+        if (track == null)
+            return NotFound();
+
+        if (!_voiceInstancesContainer.VoiceInstances.ContainsKey(guildId))
+            return BadRequest("Bot is not in voice channel");
+
+        var shutdownToken = _applicationLifetime.ApplicationStopping;
+
+        _ = Task.Run(async () =>
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var sp = scope.ServiceProvider;
+            var voiceContainer = sp.GetRequiredService<VoiceInstancesContainer>();
+
+            try
+            {
+                if (!voiceContainer.VoiceInstances.TryGetValue(guildId, out var voiceInstance) || voiceInstance is null)
+                {
+                    Log.Error("User with id: {0} invoke audio play, but bot was not connected", User.FindFirstValue(ClaimTypes.NameIdentifier));
+                    return;
+                }
+
+                // Take a playback job
+                using var job = voiceInstance.TryEnterJob(VoiceJobType.Playing);
+                if (job is not { CancellationToken: var jobToken })
+                    return;
+
+                // Link job cancellation with app shutdown
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+                    shutdownToken, jobToken);
+
+                var voiceClient = voiceInstance.Client;
+                await voiceClient.EnterSpeakingStateAsync(new(SpeakingFlags.Microphone));
+
+                using var voiceStream = voiceClient.CreateVoiceStream();
+                using OpusEncodeStream opusEncodeStream = new(voiceStream,
+                                                              PcmFormat.Float,
+                                                              VoiceChannels.Stereo,
+                                                              OpusApplication.Audio);
+
+                using var ffmpeg = Process.Start(new ProcessStartInfo
+                {
+                    FileName = _ffmpegPath,
+                    ArgumentList =
+                {
+                    "-i", track.Path,
+                    "-f", BitConverter.IsLittleEndian ? "f32le" : "f32be",
+                    "-ar", "48000",
+                    "-ac", "2",
+                    "pipe:1",
+                },
+                    RedirectStandardOutput = true,
+                })!;
+
+                var ffmpegOutput = ffmpeg.StandardOutput.BaseStream;
+                var token = linked.Token;
+
+                try
+                {
+                    await ffmpegOutput.CopyToAsync(opusEncodeStream, token);
+                    await opusEncodeStream.FlushAsync(token);
+                }
+                catch (Exception ex)
+                {
+                    ffmpeg.Kill();
+
+                    if (ex is not OperationCanceledException and not AggregateException { InnerException: OperationCanceledException })
+                        throw;
+                }
+            }
+            catch (OperationCanceledException) when (shutdownToken.IsCancellationRequested)
+            {
+                // App is shutting down
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Voice streaming failed for guild {GuildId}", guildId);
+            }
+        });
+
+        return Accepted();
+    }
+
+    [HttpPost("stop")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> StopAudioTrack([FromQuery] string guildId)
+    {
+        if (string.IsNullOrWhiteSpace(guildId)
+            || !ulong.TryParse(guildId, out var id))
+            return BadRequest("Invalid data");
+
+        if (!_voiceInstancesContainer.VoiceInstances.TryGetValue(id, out var instance) || instance is null)
+            return BadRequest("Bot is not in voice channel");
+
+        if (!instance.StopPlaying())
+            return BadRequest("Nothing is playing");
+
+        return Ok();
     }
 
     [HttpPost("update-audio-panel")]

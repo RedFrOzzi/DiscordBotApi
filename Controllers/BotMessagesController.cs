@@ -145,8 +145,6 @@ public class BotMessagesController(
         {
             using var scope = _scopeFactory.CreateScope();
             var sp = scope.ServiceProvider;
-
-            var gatewayClient = sp.GetRequiredService<GatewayClient>();
             var voiceContainer = sp.GetRequiredService<VoiceInstancesContainer>();
             var streamer = sp.GetRequiredService<TextToSpeechService>();
 
