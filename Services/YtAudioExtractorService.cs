@@ -74,7 +74,7 @@ public class YtAudioExtractorService
         return res;
     }
 
-    public async Task<ExtractedAudioData> DownloadAudioFragmentAsync(string url, TimeStamp start, TimeStamp end, string fileName, string outputFolderPath)
+    public async Task<ExtractedAudioData> DownloadAudioFragmentAsync(string url, TimeStamp? start, TimeStamp? end, string fileName, string outputFolderPath)
     {
         var path = Path.Combine(outputFolderPath, $"{fileName}.%(ext)s");
         var options = new OptionSet();
@@ -92,6 +92,9 @@ public class YtAudioExtractorService
         options.ExtractAudio = true;
         options.AudioFormat = AudioConversionFormat.Mp3;
         options.Output = path;
+
+        start ??= TimeStamp.Zero;
+        end ??= TimeStamp.Full;
 
         options.AddCustomOption<string>("--download-sections", $"*{start}-{end}");
 

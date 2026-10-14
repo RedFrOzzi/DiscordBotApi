@@ -7,6 +7,6 @@ public class YtAudioExtractorData
     public ulong GuildId { get; set; }
     public string URL { get; set; } = string.Empty;
     public string OutputName { get; set; } = string.Empty;
-    public TimeStamp StartsAt { get; set; }
-    public TimeStamp EndsAt { get; set; }
+    public TimeStamp? StartsAt { get; set; } = TimeStamp.Zero;
+    public TimeStamp? EndsAt { get; set; } = TimeStamp.Full;
 }

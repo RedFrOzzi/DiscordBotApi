@@ -205,7 +205,7 @@ public static class SaveDiscordDataUtils
         context.SaveChanges();
     }
 
-    public static bool CreateRaffleSettingsOrAddRole(ApplicationDbContext ctx, ulong guildId, ulong roleId)
+    public static bool CreateSettingsOrAddRole(ApplicationDbContext ctx, ulong guildId, ulong roleId)
     {
         var guild = ctx.Guilds.FirstOrDefault(g => g.Id == guildId);
         if (guild == null)
@@ -243,7 +243,7 @@ public static class SaveDiscordDataUtils
         return ctx.SaveChanges() > 0;
     }
 
-    public static bool RemoveRoleFromRaffleSettings(ApplicationDbContext ctx, ulong guildId, ulong roleId)
+    public static bool RemoveRoleFromSettings(ApplicationDbContext ctx, ulong guildId, ulong roleId)
     {
         var guild = ctx.Guilds.FirstOrDefault(g => g.Id == guildId);
         if (guild == null)

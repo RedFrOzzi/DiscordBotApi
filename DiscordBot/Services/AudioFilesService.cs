@@ -1,18 +1,17 @@
 ﻿using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Database;
 using DiscordBotApi.Utilities.Result;
-using Microsoft.EntityFrameworkCore;
-using System.Collections.Concurrent;
 using System.Text.RegularExpressions;
 
 namespace DiscordBotApi.DiscordBot.Services;
 
 public partial class AudioFilesService()
 {
+    public static string AudioTracksDataBasePath => _basePath;
+
     readonly static string _basePath = Path.Combine(AppContext.BaseDirectory, "DataStorage");
     const long _reservedFreeSpace = 536900000; //0.5 gb
     const int _maxTitleLength = 79;
-    static readonly ConcurrentDictionary<string, string> _titleToPathCollection = [];
 
     public static async Task<Result> TrySaveFile(ApplicationDbContext dbContext, IFormFile file, string title, ulong guildId)
     {
@@ -56,7 +55,6 @@ public partial class AudioFilesService()
         var track =  new AudioTrack()
         {
             Title = title,
-            Path = filePath,
             Guild = guild,
             CreatedAt = moscowTime,
         };
@@ -115,7 +113,6 @@ public partial class AudioFilesService()
         var track = new AudioTrack()
         {
             Title = title,
-            Path = filePath,
             Guild = guild,
             CreatedAt = moscowTime,
         };
@@ -146,12 +143,15 @@ public partial class AudioFilesService()
         var audioTrack = dbContext.AudioTracks
             .FirstOrDefault(t => t.Guild.Id == guildId && t.Title == title);
 
-        if (audioTrack == null)
+        var filePath = GetAudioTrackPath(guildId, title);
+
+        if (audioTrack == null
+            || !File.Exists(filePath))
             return new NotFoundError("Файл не найден");
 
         try
         {
-            File.Delete(audioTrack.Path);
+            File.Delete(filePath);
         }
         catch
         {
@@ -165,23 +165,9 @@ public partial class AudioFilesService()
         return Success.Empty;
     }
 
-    public static string? GetAudioTrackPath(ApplicationDbContext dbContext, string title)
-    {
-        if (_titleToPathCollection.TryGetValue(title, out var path))
-            return path;
-
-        var audioTrack = dbContext.AudioTracks
-            .AsNoTracking()
-            .FirstOrDefault(t => t.Title == title);
-
-        if (audioTrack == null)
-            return null;
-
-        _titleToPathCollection.TryAdd(title, audioTrack.Path);
-        return audioTrack.Path;
-    }
-
     public static bool IsTitleCorrect(string title) => title.Length <= _maxTitleLength && LettersNumbersSymbolsRegex().IsMatch(title);
+
+    public static string GetAudioTrackPath(ulong guildId, string title) => Path.Combine(Path.Combine(_basePath, guildId.ToString()), $"{title}.mp3");
 
     [GeneratedRegex(@"^[\p{L}\p{N}_*. ,:&?!@#$%()<>-]+$")]
     private static partial Regex LettersNumbersSymbolsRegex();

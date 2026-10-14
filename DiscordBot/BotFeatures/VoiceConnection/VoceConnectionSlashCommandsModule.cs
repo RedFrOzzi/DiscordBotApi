@@ -1,10 +1,8 @@
-﻿using DiscordBotApi.Data.AudioPanels;
-using DiscordBotApi.Data.AudioTracks;
+﻿using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Utilities;
 using DiscordBotApi.Utilities.Result;
-using Microsoft.EntityFrameworkCore;
 using NetCord;
 using NetCord.Gateway.Voice;
 using NetCord.Rest;

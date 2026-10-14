@@ -1,4 +1,5 @@
-﻿using DiscordBotApi.Database;
+﻿using DiscordBotApi.Data.Settings;
+using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Utilities;
 using DiscordBotApi.Utilities.Result;
@@ -114,7 +115,7 @@ public class BotApplicationSetupSlashCommandsModule(ApplicationDbContext dbConte
             return;
         }
 
-        if (SaveDiscordDataUtils.CreateRaffleSettingsOrAddRole(_dbContext, Context.Guild.Id, role.Id))
+        if (SaveDiscordDataUtils.CreateSettingsOrAddRole(_dbContext, Context.Guild.Id, role.Id))
         {
             InteractionMessageProperties imsgp = new()
             {
@@ -174,7 +175,7 @@ public class BotApplicationSetupSlashCommandsModule(ApplicationDbContext dbConte
             return;
         }
 
-        if (SaveDiscordDataUtils.RemoveRoleFromRaffleSettings(_dbContext, Context.Guild.Id, role.Id))
+        if (SaveDiscordDataUtils.RemoveRoleFromSettings(_dbContext, Context.Guild.Id, role.Id))
         {
             InteractionMessageProperties imsgp = new()
             {
@@ -193,5 +194,84 @@ public class BotApplicationSetupSlashCommandsModule(ApplicationDbContext dbConte
             Flags = MessageFlags.Ephemeral
         };
         await RespondAsync(InteractionCallback.Message(errorMsgProps2));
+    }
+
+    [SubSlashCommand("цвета_кнопок", "Изменяет палитру цветов для кнопок аудио панели")]
+    public async Task ChangeButtonsTheme(ButtonsColorTheme theme)
+    {
+        var result = await PrivilegedUsersService.IsAuthorizedRoleOrOwner(Context, _dbContext);
+        if (result is Error)
+        {
+            InteractionMessageProperties imsgp = new()
+            {
+                Content = result.Message,
+                Flags = MessageFlags.Ephemeral
+            };
+            var errorMsg = InteractionCallback.Message(imsgp);
+
+            await RespondAsync(errorMsg);
+            return;
+        }
+
+        if (Context.Guild == null)
+        {
+            InteractionMessageProperties imsgp = new()
+            {
+                Content = "Внутреняя ошибка",
+                Flags = MessageFlags.Ephemeral
+            };
+            var errorMsg = InteractionCallback.Message(imsgp);
+
+            await RespondAsync(errorMsg);
+            return;
+        }
+
+        Settings? settings = _dbContext.Settings.FirstOrDefault(s => s.Guild.Id == Context.Guild.Id);
+        if (settings == null)
+        {
+            var guild = _dbContext.Guilds.FirstOrDefault(g => g.Id == Context.Guild.Id);
+            if (guild == null)
+            {
+                InteractionMessageProperties imsgp = new()
+                {
+                    Content = "Канал не сохранен в базу данных",
+                    Flags = MessageFlags.Ephemeral
+                };
+                var errorMsg = InteractionCallback.Message(imsgp);
+
+                await RespondAsync(errorMsg);
+                return;
+            }
+
+            settings = new()
+            {
+                Guild = guild,
+                ButtonsColorTheme = theme
+            };
+
+            _dbContext.Settings.Add(settings);
+            _dbContext.SaveChanges();
+            InteractionMessageProperties respondMsg = new()
+            {
+                Content = "Настройки сохранены",
+                Flags = MessageFlags.Ephemeral
+            };
+            var msg = InteractionCallback.Message(respondMsg);
+
+            await RespondAsync(msg);
+            return;
+        }
+
+        settings.ButtonsColorTheme = theme;
+        _dbContext.SaveChanges();
+        InteractionMessageProperties props = new()
+        {
+            Content = "Настройки сохранены",
+            Flags = MessageFlags.Ephemeral
+        };
+        var m = InteractionCallback.Message(props);
+
+        await RespondAsync(m);
+        return;
     }
 }

@@ -39,15 +39,22 @@ public class AudioPanelUtils
             await TryDeleteAudioPanelMessages(audioPanel, module.Context);
         }
 
+        var theme = dbContext.Settings
+            .AsNoTracking()
+            .Where(s => s.Guild.Id == guildId)
+            .Select(s => s.ButtonsColorTheme)
+            .FirstOrDefault();
+
         var buttons = new List<ButtonProperties>
         {
             new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", ButtonStyle.Danger)
         };
 
-        foreach (var track in audioTracks)
+        for (int i = 0; i < audioTracks.Count; i++)
         {
+            Data.AudioTracks.AudioTrack? track = audioTracks[i];
             buttons.Add(new ButtonProperties(
-                $"{VoiceConnectionConstants.VoicePanelButtonId}:{track.Title}", track.Title, ButtonStyle.Primary));
+                $"{VoiceConnectionConstants.VoicePanelButtonId}:{track.Title}", track.Title, GetCurrentButtonStyle(theme, i)));
         }
 
         var actionRows = new List<ActionRowProperties>();
@@ -110,5 +117,41 @@ public class AudioPanelUtils
             }
             catch { }
         }
+    }
+
+    public static ButtonStyle GetCurrentButtonStyle(ButtonsColorTheme theme, int index)
+    {
+        if (theme == ButtonsColorTheme.Alternates)
+        {
+            if (index % 2 == 0)
+                return ButtonStyle.Success;
+
+            return ButtonStyle.Primary;
+        }
+
+        if (theme == ButtonsColorTheme.FullColors)
+        {
+            if (index % 3 == 0)
+                return ButtonStyle.Success;
+
+            if (index % 2 == 0)
+                return ButtonStyle.Secondary;
+
+            return ButtonStyle.Primary;
+        }
+
+        if (theme == ButtonsColorTheme.Chaos)
+        {
+            var rnd =  Random.Shared.Next(0, 4);
+            return rnd switch
+            {
+                0 => ButtonStyle.Primary,
+                1 => ButtonStyle.Secondary,
+                2 => ButtonStyle.Danger,
+                _ => ButtonStyle.Success,
+            };
+        }
+
+        return ButtonStyle.Primary;
     }
 }

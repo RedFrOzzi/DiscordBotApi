@@ -2,6 +2,7 @@
 using DiscordBotApi.Data.AudioTracks;
 using DiscordBotApi.Data.YtAudioExtractorDatas;
 using DiscordBotApi.Database;
+using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Services;
 using DiscordBotApi.Utilities.Result;
 using Microsoft.AspNetCore.Authorization;
@@ -28,8 +29,7 @@ public partial class YtAudioExtractorController(
     readonly IServiceScopeFactory _scopeFactory = scopeFactory;
     const string _checkExtractionStatusEndpoint = "check-extraction";
     const string _getExtractedAudioEndpoint = "get-extracted";
-    readonly static string _basePath = Path.Combine(AppContext.BaseDirectory, "DataStorage");
-    readonly static string _audioExtractionDirectory = Path.Combine(Path.Combine(AppContext.BaseDirectory, "DataStorage"), "TempAudio");
+    readonly static string _audioExtractionDirectory = Path.Combine(AudioFilesService.AudioTracksDataBasePath, "TempAudio");
     readonly static string _checkStatusUrl = $"yt-extractor/{_checkExtractionStatusEndpoint}";
     readonly static string _getExtractedAudioUrl = $"yt-extractor/{_getExtractedAudioEndpoint}";
     const long _reservedFreeSpace = 536900000; //0.5 gb
@@ -46,6 +46,8 @@ public partial class YtAudioExtractorController(
         if (ytAudioExtractorData.GuildId <= 1
             || string.IsNullOrWhiteSpace(ytAudioExtractorData.URL)
             || string.IsNullOrWhiteSpace(ytAudioExtractorData.OutputName)
+            || ytAudioExtractorData.StartsAt is null
+            || ytAudioExtractorData.EndsAt is null
             || ytAudioExtractorData.StartsAt.Equals(ytAudioExtractorData.EndsAt)
             || ytAudioExtractorData.StartsAt > ytAudioExtractorData.EndsAt)
         {
@@ -65,7 +67,7 @@ public partial class YtAudioExtractorController(
             return NotFound("Guild was not found");
         }
 
-        var directory = Path.Combine(_basePath, ytAudioExtractorData.GuildId.ToString());
+        var directory = Path.Combine(AudioFilesService.AudioTracksDataBasePath, ytAudioExtractorData.GuildId.ToString());
 
         if (!Directory.Exists(directory))
             Directory.CreateDirectory(directory);
@@ -111,7 +113,6 @@ public partial class YtAudioExtractorController(
         var audioTrack = new AudioTrack()
         {
             Title = ytAudioExtractorData.OutputName,
-            Path = filePath,
             Guild = guild,
             CreatedAt = moscowTime,
         };
@@ -286,7 +287,7 @@ public partial class YtAudioExtractorController(
             .Any(t => t.Title == audioTrackDto.Title))
             return Problem("Track with this tiltle already exist", HttpContext.Request.Path, StatusCodes.Status409Conflict);
 
-        var directory = Path.Combine(_basePath, guild.Id.ToString());
+        var directory = Path.Combine(AudioFilesService.AudioTracksDataBasePath, guild.Id.ToString());
 
         if (!Directory.Exists(directory))
             Directory.CreateDirectory(directory);
@@ -322,7 +323,6 @@ public partial class YtAudioExtractorController(
         var track = new AudioTrack()
         {
             Title = audioTrackDto.Title,
-            Path = fileOutputPath,
             Guild = guild,
             CreatedAt = moscowTime,
         };

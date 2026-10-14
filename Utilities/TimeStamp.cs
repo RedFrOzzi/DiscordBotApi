@@ -8,6 +8,24 @@ public class TimeStamp : IEquatable<TimeStamp>
     public int Miliseconds { get; set; }
     public bool IsTillTheEnd { get; set; }
 
+    public static TimeStamp Zero => new()
+    {
+        Hours = 0,
+        Minutes = 0,
+        Seconds = 0,
+        Miliseconds = 0,
+        IsTillTheEnd = false
+    };
+
+    public static TimeStamp Full => new()
+    {
+        Hours = 0,
+        Minutes = 0,
+        Seconds = 0,
+        Miliseconds = 0,
+        IsTillTheEnd = true
+    };
+
     public long TotalMilliseconds =>
         (long)Hours * 3_600_000 +
         (long)Minutes * 60_000 +

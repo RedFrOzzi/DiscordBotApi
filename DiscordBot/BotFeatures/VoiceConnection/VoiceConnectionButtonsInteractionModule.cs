@@ -1,4 +1,5 @@
 ﻿using DiscordBotApi.Database;
+using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Utilities;
 using Microsoft.EntityFrameworkCore;
 using NetCord;
@@ -74,7 +75,9 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
             return;
         }
 
-        if (!File.Exists(track.Path))
+        var filePath = AudioFilesService.GetAudioTrackPath(guild.Id, title);
+
+        if (!File.Exists(filePath))
         {
             Log.Error("User with id: {0} invoke audio play, but path was not correct", Context?.User?.Id);
             await FollowupAsync(new() { Content = "Некорректный путь файла", Flags = MessageFlags.Ephemeral });
@@ -204,7 +207,7 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
             FileName = _ffmpegPath,
             ArgumentList =
             {
-                "-i", track.Path,
+                "-i", filePath,
                 "-f", BitConverter.IsLittleEndian ? "f32le" : "f32be",
                 "-ar", "48000",
                 "-ac", "2",
@@ -269,10 +272,5 @@ public class VoiceConnectionButtonsInteractionModule(ApplicationDbContext dbCont
                 await Context.Client.UpdateVoiceStateAsync(new(guildId, null));
             }
         }
-    }
-
-    private static async Task PlayAudioTrack()
-    {
-
     }
 }

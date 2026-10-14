@@ -1,9 +1,11 @@
 ﻿using DiscordBotApi.Data.AudioPanels;
 using DiscordBotApi.Data.AudioTracks;
+using DiscordBotApi.Data.Settings;
 using DiscordBotApi.Database;
 using DiscordBotApi.DiscordBot.BotFeatures.VoiceConnection;
 using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Services;
+using DiscordBotApi.Utilities;
 using DiscordBotApi.Utilities.Result;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,6 +15,7 @@ using NetCord;
 using NetCord.Gateway;
 using NetCord.Gateway.Voice;
 using NetCord.Rest;
+using NetCord.Services;
 using Serilog;
 using System.Diagnostics;
 using System.Security.Claims;
@@ -129,15 +132,23 @@ public class AudioTracksController(
     {
         var track = _dbContext.AudioTracks
             .AsNoTracking()
-            .FirstOrDefault(t => t.Key == key);
+            .Where(t => t.Key == key)
+            .Select(t => new AudioTrackGetByTitleDto()
+            {
+                GuildId = t.Guild.Id,
+                Title = t.Title,
+            })
+            .FirstOrDefault();
 
-        if (track == null || string.IsNullOrEmpty(track.Path))
+        if (track == null)
             return NotFound();
 
-        if (!System.IO.File.Exists(track.Path))
+        var filePath = AudioFilesService.GetAudioTrackPath(track.GuildId, track.Title!);
+
+        if (!System.IO.File.Exists(filePath))
             return NotFound();
 
-        var stream = System.IO.File.OpenRead(track.Path);
+        var stream = System.IO.File.OpenRead(filePath);
         return File(stream, "audio/mpeg", fileDownloadName: $"{track.Title}.mp3", enableRangeProcessing: true);
     }
 
@@ -160,7 +171,10 @@ public class AudioTracksController(
         if (track == null)
             return NotFound("Audio track not found");
 
-        if (string.IsNullOrWhiteSpace(track.Path))
+        var filePath = AudioFilesService.GetAudioTrackPath(guildId, track.Title);
+
+        if (string.IsNullOrWhiteSpace(filePath)
+            || !System.IO.File.Exists(filePath))
             return StatusCode(StatusCodes.Status500InternalServerError, "File path corrupted");
 
         var guild = _dbContext.Guilds
@@ -169,7 +183,7 @@ public class AudioTracksController(
         if (guild == null)
             return NotFound("Guild not found");
 
-        using var sourceFileStream = System.IO.File.OpenRead(track.Path);
+        using var sourceFileStream = System.IO.File.OpenRead(filePath);
 
         var result = await AudioFilesService.TrySaveFile(_dbContext, sourceFileStream, track.SizeInKb ?? 0, track.Title, guildId);
         return result switch
@@ -199,17 +213,21 @@ public class AudioTracksController(
             return BadRequest("Incorrect new title");
 
         var track = _dbContext.AudioTracks
+            .Include(t => t.Guild)
             .FirstOrDefault(t => t.Key == audioTrackDto.Key);
 
         if (track == null)
             return NotFound();
 
-        if (string.IsNullOrWhiteSpace(track.Path))
+        var filePath = AudioFilesService.GetAudioTrackPath(track.Guild.Id, track.Title);
+
+        if (string.IsNullOrWhiteSpace(filePath)
+            || !System.IO.File.Exists(filePath))
             return StatusCode(StatusCodes.Status500InternalServerError, "Track's path is empty");
 
         try
         {
-            string directory = Path.GetDirectoryName(track.Path);
+            string? directory = Path.GetDirectoryName(filePath);
             if (string.IsNullOrWhiteSpace(directory))
                 return StatusCode(StatusCodes.Status500InternalServerError, "Track's path is corrupted");
 
@@ -221,13 +239,12 @@ public class AudioTracksController(
             if (!Directory.Exists(directory))
                 Directory.CreateDirectory(directory);
 
-            if (System.IO.File.Exists(track.Path))
-                System.IO.File.Move(track.Path, newFullPath);
+            if (System.IO.File.Exists(filePath))
+                System.IO.File.Move(filePath, newFullPath);
             else
                 return StatusCode(StatusCodes.Status500InternalServerError, "Track's path is corrupted");
 
             track.Title = audioTrackDto.NewTitle;
-            track.Path = newFullPath;
             _dbContext.SaveChanges();
         }
         catch (Exception ex)
@@ -272,11 +289,16 @@ public class AudioTracksController(
 
         var track = _dbContext.AudioTracks
            .AsNoTracking()
-           .Where(t => t.Guild.Id == guildId)
-           .FirstOrDefault(t => t.Key == key);
+           .Where(t => t.Guild.Id == guildId && t.Key == key)
+           .FirstOrDefault();
 
         if (track == null)
             return NotFound();
+
+        var filePath = AudioFilesService.GetAudioTrackPath(guildId, track.Title);
+        if (string.IsNullOrWhiteSpace(filePath)
+            || !System.IO.File.Exists(filePath))
+            return StatusCode(StatusCodes.Status500InternalServerError, "Track path is corrupted");
 
         if (!_voiceInstancesContainer.VoiceInstances.ContainsKey(guildId))
             return BadRequest("Bot is not in voice channel");
@@ -320,7 +342,7 @@ public class AudioTracksController(
                     FileName = _ffmpegPath,
                     ArgumentList =
                 {
-                    "-i", track.Path,
+                    "-i", filePath,
                     "-f", BitConverter.IsLittleEndian ? "f32le" : "f32be",
                     "-ar", "48000",
                     "-ac", "2",
@@ -428,15 +450,22 @@ public class AudioTracksController(
             }
         }
 
+        var theme = _dbContext.Settings
+            .AsNoTracking()
+            .Where(s => s.Guild.Id == guildId)
+            .Select(s => s.ButtonsColorTheme)
+            .FirstOrDefault();
+
         var buttons = new List<ButtonProperties>
         {
             new($"{VoiceConnectionConstants.VoicePanelStopButtonId}", "ОСТАНОВИТЬ", ButtonStyle.Danger)
         };
 
-        foreach (var track in audioTracks)
+        for (int i = 0; i < audioTracks.Count; i++)
         {
+            AudioTrack? track = audioTracks[i];
             buttons.Add(new ButtonProperties(
-                $"{VoiceConnectionConstants.VoicePanelButtonId}:{track.Title}", track.Title, ButtonStyle.Primary));
+                $"{VoiceConnectionConstants.VoicePanelButtonId}:{track.Title}", track.Title, AudioPanelUtils.GetCurrentButtonStyle(theme, i)));
         }
 
         var actionRows = new List<ActionRowProperties>();
@@ -482,5 +511,39 @@ public class AudioTracksController(
         }
 
         return Created();
+    }
+
+    [HttpPost("theme")]
+    [ProducesResponseType(201)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> ChangeAudioPanelTheme([FromQuery] string guildId, [FromQuery] ButtonsColorTheme theme)
+    {
+        if (string.IsNullOrWhiteSpace(guildId)
+            || !ulong.TryParse(guildId, out var id))
+            return BadRequest();
+
+        var settings = _dbContext.Settings.FirstOrDefault(s => s.Guild.Id == id);
+        if (settings == null)
+        {
+            var guild = _dbContext.Guilds.FirstOrDefault(g => g.Id == id);
+            if (guild == null)
+                return NotFound("Guild not found");
+
+            var set = new Settings()
+            {
+                Guild = guild,
+                ButtonsColorTheme = theme
+            };
+
+            _dbContext.Settings.Add(set);
+            _dbContext.SaveChanges();
+            return Ok();
+        }
+
+        settings.ButtonsColorTheme = theme;
+        _dbContext.SaveChanges();
+        return Ok();
     }
 }

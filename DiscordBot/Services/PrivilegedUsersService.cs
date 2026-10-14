@@ -23,21 +23,17 @@ public class PrivilegedUsersService
             return Success.Empty;
 
         var allowedRoleIds = dbContext.Settings
-            .AsNoTracking()
-            .Include(s => s.PrivilegedRoles)
-            .FirstOrDefault(rs => rs.Guild.Id == context.Guild.Id)?.PrivilegedRoles
-            ?.Select(gr => gr.Id)
-            .ToArray();
+        .AsNoTracking()
+        .Where(s => s.Guild.Id == context.Guild.Id)
+        .SelectMany(s => s.PrivilegedRoles)
+        .Select(r => r.Id)
+        .ToArray();
 
         if (allowedRoleIds == null)
             return new Error("Не настроены роли для пользователей");
 
-        var roles = guildUser.GetRoles(context.Guild);
-        foreach (var role in roles)
-        {
-            if (allowedRoleIds.Contains(role.Id))
-                return Success.Empty;
-        }
+        if (guildUser.GetRoles(context.Guild).Any(r => allowedRoleIds.Contains(r.Id)))
+            return Success.Empty;
 
         return new Error("Роль пользователя не авторизована");
     }
