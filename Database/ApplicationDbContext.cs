@@ -9,6 +9,7 @@ using DiscordBotApi.Data.Raffles;
 using DiscordBotApi.Data.RefreshTokens;
 using DiscordBotApi.Data.Roles;
 using DiscordBotApi.Data.Settings;
+using DiscordBotApi.Data.TelegramBotImages;
 using Microsoft.EntityFrameworkCore;
 
 namespace DiscordBotApi.Database;
@@ -31,6 +32,9 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AudioTrack> AudioTracks { get; set; }
     public DbSet<AudioPanel> AudioPanels { get; set; }
     public DbSet<AudioExtractionState> AudioExtractionState { get; set; }
+
+    //Telegram
+    public DbSet<TelegramBotImage> TelegramBotImages { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -105,6 +109,12 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         modelBuilder.Entity<AudioExtractionState>(entity =>
         {
             entity.HasAlternateKey(s => s.RequestId);
+        });
+
+        modelBuilder.Entity<TelegramBotImage>(entity =>
+        {
+            entity.HasIndex(i => i.Command)
+                .IsUnique();
         });
     }
 }

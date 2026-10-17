@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using DiscordBotApi.TelegramBot;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using System.Diagnostics;
@@ -15,7 +16,7 @@ public class ManagmentController : ControllerBase
 {
     readonly string _logsPath;
 
-    public ManagmentController()
+    public ManagmentController(TelegramBotService botService)
     {
         var fullPath = Environment.GetEnvironmentVariable("LOGS_PATH");
         if (!string.IsNullOrWhiteSpace(fullPath))

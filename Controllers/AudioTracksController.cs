@@ -166,12 +166,13 @@ public class AudioTracksController(
 
         var track = _dbContext.AudioTracks
             .AsNoTracking()
+            .Include(t => t.Guild)
             .FirstOrDefault(t => t.Key == audioTrackDto.Key);
 
         if (track == null)
             return NotFound("Audio track not found");
 
-        var filePath = AudioFilesService.GetAudioTrackPath(guildId, track.Title);
+        var filePath = AudioFilesService.GetAudioTrackPath(track.Guild.Id, track.Title);
 
         if (string.IsNullOrWhiteSpace(filePath)
             || !System.IO.File.Exists(filePath))

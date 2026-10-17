@@ -4,6 +4,7 @@ using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.Middlewares;
 using DiscordBotApi.Services;
 using DiscordBotApi.Services.GuildUpdater;
+using DiscordBotApi.TelegramBot;
 using DiscordBotApi.Utilities;
 using dotenv.net;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -22,6 +23,7 @@ using Serilog.Templates;
 using System.Net;
 using System.Security.Claims;
 using System.Text;
+using Telegram.Bot;
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
@@ -122,6 +124,14 @@ try
     builder.Services.AddScoped<IGuildUpdateProcessor, GuildUpdateProcessor>();
     builder.Services.AddHostedService<GuildUpdateBackgroundService>();
 
+    //Telegram
+    var botToken = Environment.GetEnvironmentVariable("TELEGRAM_BOT_TOKEN");
+    if (!string.IsNullOrWhiteSpace(botToken))
+    {
+        builder.Services.AddSingleton(sp => new TelegramBotClient(botToken));
+        builder.Services.AddScoped<TelegramBotService>();
+    }
+
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         options.ForwardedHeaders = ForwardedHeaders.XForwardedFor |
@@ -178,6 +188,16 @@ try
     app.UseAuthorization();
 
     app.AddModules(typeof(Program).Assembly);
+
+    //Telegram bot
+    var webhookUrl = Environment.GetEnvironmentVariable("TELEGRAM_BOT_WEBHOOK_URL");
+    if (webhookUrl != null)
+    {
+        using var scope = app.Services.CreateScope();
+        var botService = scope.ServiceProvider.GetRequiredService<TelegramBotService>();
+
+        await botService.SetWebhookAsync(webhookUrl);
+    }
 
     await app.RunAsync();
 }
