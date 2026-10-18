@@ -1,9 +1,10 @@
-﻿using DiscordBotApi.Database;
-using Microsoft.EntityFrameworkCore;
+﻿using DiscordBotApi.Data.TelegramBotImages;
+using DiscordBotApi.Database;
 using Serilog;
 using Telegram.Bot;
 using Telegram.Bot.Exceptions;
 using Telegram.Bot.Types;
+using Telegram.Bot.Types.Enums;
 
 namespace DiscordBotApi.TelegramBot;
 
@@ -11,12 +12,14 @@ public class TelegramBotService
 {
     readonly TelegramBotClient _botClient;
     readonly ApplicationDbContext _dbContext;
+    readonly TelegramBotSlashCommands _slashCommands;
     readonly static string _baseImagePath = Path.Combine(AppContext.BaseDirectory, "ImageStorage");
 
-    public TelegramBotService(TelegramBotClient telegramBotClient, ApplicationDbContext dbContext)
+    public TelegramBotService(TelegramBotClient telegramBotClient, ApplicationDbContext dbContext, TelegramBotSlashCommands slashCommands)
     {
         _botClient = telegramBotClient;
         _dbContext = dbContext;
+        _slashCommands = slashCommands;
 
         if (!Directory.Exists(_baseImagePath))
         {
@@ -32,11 +35,23 @@ public class TelegramBotService
         if (message.From?.IsBot == true)
             return;
 
+        //Commands
+        if (rawText.StartsWith('/'))
+        {
+            var words = rawText.Split(' ');
+            if (words is not null && words.Length > 0)
+            {
+                var command = words[0].ToLowerInvariant();
+                await _slashCommands.ExecuteCommand(command, update, cancellationToken);
+                return;
+            }
+        }
+
+        //Text to image replace
         if (!TelegramBotHelpers.TryNormalizeWord(rawText, out var normalized))
             return;
 
         var record = _dbContext.TelegramBotImages
-            .AsNoTracking()
             .FirstOrDefault(w => w.Command == normalized);
 
         if (record is null)
@@ -55,27 +70,19 @@ public class TelegramBotService
 
         try
         {
-            await SendImageWithReplyAsync(_botClient, message.Chat.Id, replyParams, fullPath, record.Command, cancellationToken);
+            if (IsAnimated(record.ImageFileName))
+                await SendAnimationWithReplyAsync(_botClient, _dbContext, message.Chat.Id, message.From, replyParams, record, fullPath, cancellationToken);
+            else
+                await SendImageWithReplyAsync(_botClient, _dbContext, message.Chat.Id, message.From, replyParams, record, fullPath, cancellationToken);
         }
         catch (ApiRequestException ex) when (ex.ErrorCode == 400 && replyParams is not null)
         {
             Log.Warning(ex,"Не удалось ответить на сообщение, отправляем без reply");
-            await SendImageWithReplyAsync(_botClient, message.Chat.Id, null, fullPath, record.Command, cancellationToken);
-        }
 
-        try
-        {
-            await using var stream = File.OpenRead(fullPath);
-            await _botClient.SendPhoto(
-                chatId: message.Chat.Id,
-                photo: InputFile.FromStream(stream, record.ImageFileName),
-                replyParameters: replyParams,
-                cancellationToken: cancellationToken);
-        }
-        catch (ApiRequestException ex)
-        {
-            Log.Error(ex, "Не удалось отправить картинку для '{0}'", record.Command);
-            return;
+            if (IsAnimated(record.ImageFileName))
+                await SendAnimationWithReplyAsync(_botClient, _dbContext, message.Chat.Id, message.From, null, record, fullPath, cancellationToken);
+            else
+                await SendImageWithReplyAsync(_botClient, _dbContext, message.Chat.Id, message.From, null, record, fullPath, cancellationToken);
         }
 
         try
@@ -110,17 +117,164 @@ public class TelegramBotService
 
     private static async Task SendImageWithReplyAsync(
         TelegramBotClient botClient,
+        ApplicationDbContext context,
         long chatId,
+        User? senderUser,
         ReplyParameters? rp,
+        TelegramBotImage record,
         string fullPath,
-        string imageName,
         CancellationToken ct)
     {
-        await using var stream = File.OpenRead(fullPath);
-        await botClient.SendPhoto(
-            chatId: chatId,
-            photo: InputFile.FromStream(stream, imageName),
-            replyParameters: rp,
-            cancellationToken: ct);
+        string caption;
+        string username;
+        if (senderUser != null)
+        {
+            username = senderUser.Username ?? senderUser.FirstName;
+            caption = $"<a href=\"tg://user?id={senderUser.Id}\">{username}</a>";
+        }
+        else
+        {
+            caption = $"кто-то ¯\\_(ツ)_/¯";
+        }
+
+        if (string.IsNullOrWhiteSpace(record.TelegramFileId))
+        {
+            //open stream, send file
+            await using var stream = File.OpenRead(fullPath);
+            var sentMessage = await botClient.SendPhoto(
+                    chatId: chatId,
+                    photo: InputFile.FromStream(stream, record.ImageFileName),
+                    replyParameters: rp,
+                    caption: caption,
+                    parseMode: ParseMode.Html,
+                    disableNotification: true,
+                    cancellationToken: ct);
+
+            //save image id
+            if (sentMessage.Photo?.Length > 0)
+            {
+                record.TelegramFileId = sentMessage.Photo.Last().FileId;
+                context.SaveChanges();
+            }
+
+            return;
+        }
+
+        try
+        {
+            await botClient.SendPhoto(
+                        chatId: chatId,
+                        photo: record.TelegramFileId,
+                        replyParameters: rp,
+                        caption: caption,
+                        parseMode: ParseMode.Html,
+                        disableNotification: true,
+                        cancellationToken: ct);
+        }
+        catch (ApiRequestException ex) when (ex.ErrorCode == 400)
+        {
+            Log.Warning("File_id {Id} is stale, re-uploading...", record.TelegramFileId);
+
+            //reupload image and save new FieldId
+            await using var stream = File.OpenRead(fullPath);
+            var sentMessage = await botClient.SendPhoto(
+                    chatId: chatId,
+                    photo: InputFile.FromStream(stream, record.ImageFileName),
+                    replyParameters: rp,
+                    caption: caption,
+                    parseMode: ParseMode.Html,
+                    disableNotification: true,
+                    cancellationToken: ct);
+
+            //save image id
+            if (sentMessage.Photo?.Length > 0)
+            {
+                record.TelegramFileId = sentMessage.Photo.Last().FileId;
+                context.SaveChanges();
+            }
+        }
     }
+
+    private static async Task SendAnimationWithReplyAsync(
+        TelegramBotClient botClient,
+        ApplicationDbContext context,
+        long chatId,
+        User? senderUser,
+        ReplyParameters? rp,
+        TelegramBotImage record,
+        string fullPath,
+        CancellationToken ct)
+    {
+        string caption;
+        string username;
+        if (senderUser != null)
+        {
+            username = senderUser.Username ?? senderUser.FirstName;
+            caption = $"<a href=\"tg://user?id={senderUser.Id}\">{username}</a>";
+        }
+        else
+        {
+            caption = $"кто-то ¯\\_(ツ)_/¯";
+        }
+
+        if (string.IsNullOrWhiteSpace(record.TelegramFileId))
+        {
+            //open stream, send file
+            await using var stream = File.OpenRead(fullPath);
+            var sentMessage = await botClient.SendAnimation(
+                chatId: chatId,
+                animation: InputFile.FromStream(stream, record.ImageFileName),
+                replyParameters: rp,
+                caption: caption,
+                parseMode: ParseMode.Html,
+                disableNotification: true,
+                cancellationToken: ct);
+
+            //save image id
+            if (sentMessage.Photo?.Length > 0)
+            {
+                record.TelegramFileId = sentMessage.Photo.Last().FileId;
+                context.SaveChanges();
+            }
+
+            return;
+        }
+
+        try
+        {
+            await botClient.SendAnimation(
+                    chatId: chatId,
+                    animation: record.TelegramFileId,
+                    replyParameters: rp,
+                    caption: caption,
+                    parseMode: ParseMode.Html,
+                    disableNotification: true,
+                    cancellationToken: ct);
+        }
+        catch (ApiRequestException ex) when (ex.ErrorCode == 400)
+        {
+            Log.Warning("File_id {Id} is stale, re-uploading...", record.TelegramFileId);
+
+            //reupload image and save new FieldId
+            await using var stream = File.OpenRead(fullPath);
+            var sentMessage = await botClient.SendAnimation(
+                    chatId: chatId,
+                    animation: InputFile.FromStream(stream, record.ImageFileName),
+                    replyParameters: rp,
+                    caption: caption,
+                    parseMode: ParseMode.Html,
+                    disableNotification: true,
+                    cancellationToken: ct);
+
+            //save image id
+            if (sentMessage.Photo?.Length > 0)
+            {
+                record.TelegramFileId = sentMessage.Photo.Last().FileId;
+                context.SaveChanges();
+            }
+        }
+    }
+
+    static bool IsAnimated(string fileName) =>
+        Path.GetExtension(fileName).ToLowerInvariant() is ".gif" or ".webp";
 }

@@ -1,13 +1,15 @@
-﻿using DiscordBotApi.Data.TelegramBotImages;
+﻿using DiscordBotApi.Data.AudioTracks;
+using DiscordBotApi.Data.TelegramBotImages;
 using DiscordBotApi.Database;
+using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.TelegramBot;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.StaticFiles;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
-using Serilog.Core;
 using System.Text.Json;
 using Telegram.Bot;
-using Telegram.Bot.Requests.Abstractions;
 using Telegram.Bot.Types;
 
 namespace DiscordBotApi.Controllers;
@@ -65,7 +67,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
             return BadRequest("Missing Command Name");
 
         if (!TelegramBotHelpers.TryNormalizeWord(uploadDto.Command, out var normalized))
-            return BadRequest("Word must be a single latin word (a-z only)");
+            return BadRequest("Word must be a single word");
 
         if (uploadDto.Image is null || uploadDto.Image.Length == 0)
             return BadRequest(new { error = "Image is required" });
@@ -130,17 +132,17 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
         return Ok();
     }
 
-    [HttpDelete("image-delete")]
+    [HttpDelete("{key:int}/image-delete")]
     [Authorize(Roles = "Admin, Moderator")]
     [ProducesResponseType(204)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
-    public async Task<IActionResult> Delete([FromQuery] string command, CancellationToken ct)
+    public async Task<IActionResult> Delete(int key)
     {
-        if (!TelegramBotHelpers.TryNormalizeWord(command, out var normalized))
-            return BadRequest("Invalid Command");
+        if (key < 0)
+            return BadRequest("Invalid Key");
 
-        var existing = _dbContext.TelegramBotImages.FirstOrDefault(w => w.Command == normalized);
+        var existing = _dbContext.TelegramBotImages.FirstOrDefault(r => r.Key == key);
         if (existing is null)
             return NotFound();
 
@@ -150,6 +152,86 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
         TryDeleteFile(Path.Combine(_baseImagePath, existing.ImageFileName));
 
         return NoContent();
+    }
+
+    [HttpGet("{key:int}/image-download")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> DownloadImagerecord(int key)
+    {
+        var record = _dbContext.TelegramBotImages
+            .AsNoTracking()
+            .Where(r => r.Key == key)
+            .Select(r => new
+            {
+                r.ImageFileName
+            })
+            .FirstOrDefault();
+
+        if (record == null)
+            return NotFound();
+
+        var filePath = Path.Combine(_baseImagePath, record.ImageFileName!);
+
+        if (!System.IO.File.Exists(filePath))
+            return NotFound();
+
+        var provider = new FileExtensionContentTypeProvider();
+        if (!provider.TryGetContentType(record.ImageFileName!, out var contentType))
+        {
+            contentType = "application/octet-stream";
+        }
+
+        var stream = System.IO.File.OpenRead(filePath);
+        return File(stream, contentType, fileDownloadName: record.ImageFileName!, enableRangeProcessing: false);
+    }
+
+    [HttpGet("image-get-all")]
+    [Authorize(Roles = "Admin, Moderator")]
+    [ProducesResponseType<IEnumerable<TelegramBotImageGetDto>>(200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetImages()
+    {
+        var records = _dbContext.TelegramBotImages
+            .AsNoTracking()
+            .Select(r => new TelegramBotImageGetDto()
+            {
+                Key = r.Key,
+                Command = r.Command,
+                ImageFileName = r.ImageFileName,
+                DownloadUrl = $"/tg-bot/{r.Key}/image-download",
+            })
+            .AsEnumerable();
+
+        if (records is null)
+            return NotFound();
+
+        return Ok(records);
+    }
+
+    [HttpPatch("image-rename")]
+    [Authorize(Roles = "Admin, Moderator")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> RenameCommand([FromBody] TelegramBotImageRenameDto dto)
+    {
+        if (dto is null
+            || dto.Key < 0
+            || string.IsNullOrWhiteSpace(dto.NewCommand))
+            return BadRequest();
+
+        var record = _dbContext.TelegramBotImages
+            .FirstOrDefault(r => r.Key == dto.Key);
+
+        if (record is null)
+            return NotFound();
+
+        record.Command = dto.NewCommand;
+        _dbContext.SaveChanges();
+
+        return Ok();
     }
 
 

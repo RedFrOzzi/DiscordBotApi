@@ -130,6 +130,7 @@ try
     {
         builder.Services.AddSingleton(sp => new TelegramBotClient(botToken));
         builder.Services.AddScoped<TelegramBotService>();
+        builder.Services.AddScoped<TelegramBotSlashCommands>();
     }
 
     builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -195,8 +196,10 @@ try
     {
         using var scope = app.Services.CreateScope();
         var botService = scope.ServiceProvider.GetRequiredService<TelegramBotService>();
+        var slashCommands = scope.ServiceProvider.GetRequiredService<TelegramBotSlashCommands>();
 
         await botService.SetWebhookAsync(webhookUrl);
+        await slashCommands.SetBotCommands();
     }
 
     await app.RunAsync();
