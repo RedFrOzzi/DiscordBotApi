@@ -38,10 +38,10 @@ public class TelegramBotService
         //Commands
         if (rawText.StartsWith('/'))
         {
-            var words = rawText.Split(' ', '@');
-            if (words is not null && words.Length > 0)
+            var words = rawText.Split([' ', '@'], StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length > 0)
             {
-                var command = words[0].ToLowerInvariant();
+                var command = words[0].TrimStart('/').ToLowerInvariant();
                 await _slashCommands.ExecuteCommand(command, update, cancellationToken);
             }
 
@@ -232,9 +232,9 @@ public class TelegramBotService
                 cancellationToken: ct);
 
             //save image id
-            if (sentMessage.Photo?.Length > 0)
+            if (sentMessage.Animation?.FileId is { } fileId)
             {
-                record.TelegramFileId = sentMessage.Animation?.FileId;
+                record.TelegramFileId = fileId;
                 context.SaveChanges();
             }
 
@@ -268,9 +268,9 @@ public class TelegramBotService
                     cancellationToken: ct);
 
             //save image id
-            if (sentMessage.Photo?.Length > 0)
+            if (sentMessage.Animation?.FileId is { } fileId)
             {
-                record.TelegramFileId = sentMessage.Animation?.FileId;
+                record.TelegramFileId = fileId;
                 context.SaveChanges();
             }
         }

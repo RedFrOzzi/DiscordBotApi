@@ -7,16 +7,24 @@ namespace DiscordBotApi.TelegramBot;
 
 public record TGBotCommand(string Command, string Description, Func<Update, CancellationToken, Task> Function);
 
-public class TelegramBotSlashCommands(ApplicationDbContext dbContext, TelegramBotClient botClient)
+public class TelegramBotSlashCommands
 {
-    public Dictionary<string, TGBotCommand> CommandsMap => new()
-    {
-        { "info", new("info", "Информация", InfoCommand)},
-        { "words", new("words", "Слова-триггеры", WordsCommand)},
-    };
+    public Dictionary<string, TGBotCommand> CommandsMap { get; }
 
-    readonly ApplicationDbContext _dbContext = dbContext;
-    readonly TelegramBotClient _botClient = botClient;
+    readonly ApplicationDbContext _dbContext;
+    readonly TelegramBotClient _botClient;
+
+    public TelegramBotSlashCommands(ApplicationDbContext dbContext, TelegramBotClient botClient)
+    {
+        _dbContext = dbContext;
+        _botClient = botClient;
+
+        CommandsMap = new Dictionary<string, TGBotCommand>
+        {
+            { "info",  new("info",  "Информация",     InfoCommand) },
+            { "words", new("words", "Слова-триггеры", WordsCommand) },
+        };
+    }
 
     public async Task SetBotCommands()
     {
@@ -59,8 +67,8 @@ public class TelegramBotSlashCommands(ApplicationDbContext dbContext, TelegramBo
         if (update is null || update.Message is null || update.Message.Chat is null)
             return;
 
-        var records = _dbContext.TelegramBotImages.AsEnumerable();
-        if (records is null || !records.Any())
+        var records = _dbContext.TelegramBotImages.ToList();
+        if (records is null || records.Count == 0)
             return;
 
         StringBuilder sb = new();
