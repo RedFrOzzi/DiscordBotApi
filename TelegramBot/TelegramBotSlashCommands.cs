@@ -12,7 +12,7 @@ public class TelegramBotSlashCommands(ApplicationDbContext dbContext, TelegramBo
     public Dictionary<string, TGBotCommand> CommandsMap => new()
     {
         { "info", new("info", "Информация", InfoCommand)},
-        { "words", new("info", "Слова-триггеры", WordsCommand)},
+        { "words", new("words", "Слова-триггеры", WordsCommand)},
     };
 
     readonly ApplicationDbContext _dbContext = dbContext;
