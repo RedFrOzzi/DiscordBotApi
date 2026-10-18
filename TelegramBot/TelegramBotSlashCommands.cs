@@ -1,4 +1,5 @@
 ﻿using DiscordBotApi.Database;
+using System.Text;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
@@ -10,7 +11,8 @@ public class TelegramBotSlashCommands(ApplicationDbContext dbContext, TelegramBo
 {
     public Dictionary<string, TGBotCommand> CommandsMap => new()
     {
-        { "info", new("info", "Информация", InfoCommand)}
+        { "info", new("info", "Информация", InfoCommand)},
+        { "words", new("info", "Слова-триггеры", WordsCommand)},
     };
 
     readonly ApplicationDbContext _dbContext = dbContext;
@@ -47,6 +49,29 @@ public class TelegramBotSlashCommands(ApplicationDbContext dbContext, TelegramBo
         await _botClient.SendMessage(
             update.Message.Chat.Id,
             "Бот заменяет текст на изображения/анимацию.",
+            replyParameters: new() { MessageId = update.Message.Id },
+            disableNotification: true,
+            cancellationToken: ct);
+    }
+
+    public async Task WordsCommand(Update update, CancellationToken ct)
+    {
+        if (update is null || update.Message is null || update.Message.Chat is null)
+            return;
+
+        var records = _dbContext.TelegramBotImages.AsEnumerable();
+        if (records is null || !records.Any())
+            return;
+
+        StringBuilder sb = new();
+        foreach (var item in records)
+        {
+            sb.AppendLine(item.Command);
+        }
+
+        await _botClient.SendMessage(
+            update.Message.Chat.Id,
+            sb.ToString(),
             replyParameters: new() { MessageId = update.Message.Id },
             disableNotification: true,
             cancellationToken: ct);

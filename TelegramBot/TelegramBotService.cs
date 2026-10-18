@@ -38,13 +38,14 @@ public class TelegramBotService
         //Commands
         if (rawText.StartsWith('/'))
         {
-            var words = rawText.Split(' ');
+            var words = rawText.Split(' ', '@');
             if (words is not null && words.Length > 0)
             {
                 var command = words[0].ToLowerInvariant();
                 await _slashCommands.ExecuteCommand(command, update, cancellationToken);
-                return;
             }
+
+            return;
         }
 
         //Text to image replace
@@ -233,7 +234,7 @@ public class TelegramBotService
             //save image id
             if (sentMessage.Photo?.Length > 0)
             {
-                record.TelegramFileId = sentMessage.Photo.Last().FileId;
+                record.TelegramFileId = sentMessage.Animation?.FileId;
                 context.SaveChanges();
             }
 
@@ -269,7 +270,7 @@ public class TelegramBotService
             //save image id
             if (sentMessage.Photo?.Length > 0)
             {
-                record.TelegramFileId = sentMessage.Photo.Last().FileId;
+                record.TelegramFileId = sentMessage.Animation?.FileId;
                 context.SaveChanges();
             }
         }
