@@ -1,8 +1,7 @@
-﻿using DiscordBotApi.Data.AudioTracks;
-using DiscordBotApi.Data.TelegramBotImages;
+﻿using DiscordBotApi.Data.TelegramBotImages;
 using DiscordBotApi.Database;
-using DiscordBotApi.DiscordBot.Services;
 using DiscordBotApi.TelegramBot;
+using ImageMagick;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
@@ -85,7 +84,52 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
 
         var format = TelegramBotHelpers.Detect(bytes);
         if (format is null)
-            return BadRequest(new { error = "Unsupported image format. Allowed: JPEG, PNG, GIF, WebP." });
+            return BadRequest(new { error = "Unsupported image format. Allowed: JPEG, PNG, GIF, WebP, MP4" });
+
+        if (format is { Extension: ".mp4" })
+        {
+            try
+            {
+                bytes = TelegramBotImageCropService.ConvertMp4ToGif(bytes, fps: 5, maxWidth: 480);
+                format = new(".gif", "image/gif");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Ошибка конвертации MP4 для слова '{Word}'", normalized);
+                return BadRequest(new { error = "Failed to convert MP4. Is FFmpeg installed?" });
+            }
+        }
+
+        if (format is { Extension: ".webp" })
+        {
+            try
+            {
+                if (TelegramBotImageCropService.IsAnimatedWebP(bytes))
+                {
+                    bytes = TelegramBotImageCropService.ConvertAnimatedWebPToGif(bytes);
+                    format = new(".gif", "image/gif");
+                }
+                else
+                {
+                    (bytes, format) = TelegramBotImageCropService.ConvertStaticWeb(bytes);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Ошибка конвертации WebP для слова '{Word}'", normalized);
+                return BadRequest(new { error = "Failed to convert WebP." });
+            }
+        }
+
+        try
+        {
+            bytes = TelegramBotImageCropService.Crop(bytes, uploadDto.CropPosition ?? CropPosition.Center);
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Не удалось кропнуть изображение для слова '{Word}'", normalized);
+            return BadRequest(new { error = "Failed to crop image." });
+        }
 
         var fileName = normalized + format.Extension;
         var fullPath = Path.Combine(_baseImagePath, fileName);
