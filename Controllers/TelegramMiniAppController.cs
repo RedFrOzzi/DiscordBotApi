@@ -30,14 +30,16 @@ public class TelegramMiniAppController(
         if (!ValidateTelegramData(dto.InitData, out var userId, out var username))
             return Unauthorized("Invalid Telegram data");
 
+        var searchName = username + "_tguser_2026";
+
         var apiUser = _context.ApiUsers
-            .FirstOrDefault(u => u.Login == username);
+            .FirstOrDefault(u => u.Login == searchName);
 
         if (apiUser == null)
         {
             var newUser = new ApiUser()
             {
-                Login = username,
+                Login = searchName,
                 PasswordHash = _passwordHasher.GetHash(userId + username),
                 IsTelegramUser = true,
             };
