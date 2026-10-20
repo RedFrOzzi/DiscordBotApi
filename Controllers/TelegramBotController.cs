@@ -1,7 +1,6 @@
 ﻿using DiscordBotApi.Data.TelegramBotImages;
 using DiscordBotApi.Database;
 using DiscordBotApi.TelegramBot;
-using ImageMagick;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.StaticFiles;
@@ -56,7 +55,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
     }
 
     [HttpPost("image-upload")]
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin,Moderator,TGUser")]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
@@ -177,7 +176,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
     }
 
     [HttpDelete("{key:int}/image-delete")]
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin,Moderator,TGUser")]
     [ProducesResponseType(204)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -232,7 +231,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
     }
 
     [HttpGet("image-get-all")]
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin,Moderator,TGUser")]
     [ProducesResponseType<IEnumerable<TelegramBotImageGetDto>>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetImages()
@@ -255,7 +254,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
     }
 
     [HttpPatch("image-rename")]
-    [Authorize(Roles = "Admin, Moderator")]
+    [Authorize(Roles = "Admin,Moderator,TGUser")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -278,6 +277,8 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
         return Ok();
     }
 
+
+    
 
     private static void TryDeleteFile(string path)
     {

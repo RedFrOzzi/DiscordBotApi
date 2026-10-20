@@ -11,5 +11,6 @@ public class ApiUser
     [Required] public string PasswordHash { get; set; } = string.Empty;
     public bool IsAdmin { get; set; } = false;
     public bool IsModerator { get; set; } = false;
+    public bool IsTelegramUser { get; set; } = false;
     public DiscordUser? DiscordUser { get; set; }
 }

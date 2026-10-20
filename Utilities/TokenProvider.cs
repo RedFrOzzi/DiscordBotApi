@@ -27,6 +27,9 @@ namespace DiscordBotApi.Utilities
             if (apiUser.IsModerator)
                 claims.Add(new(ClaimTypes.Role, "Moderator"));
 
+            if (apiUser.IsTelegramUser)
+                claims.Add(new(ClaimTypes.Role, "TGUser"));
+
             var tokenDescriptor = new SecurityTokenDescriptor
             {
                 Subject = new ClaimsIdentity(claims),

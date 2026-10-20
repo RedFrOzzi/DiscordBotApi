@@ -192,7 +192,7 @@ try
 
     //Telegram bot
     var webhookUrl = Environment.GetEnvironmentVariable("TELEGRAM_BOT_WEBHOOK_URL");
-    if (webhookUrl != null)
+    if (!string.IsNullOrWhiteSpace(botToken) && !string.IsNullOrWhiteSpace(webhookUrl))
     {
         using var scope = app.Services.CreateScope();
         var botService = scope.ServiceProvider.GetRequiredService<TelegramBotService>();
