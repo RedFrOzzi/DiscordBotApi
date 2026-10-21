@@ -7,8 +7,8 @@ namespace DiscordBotApi.TelegramBot;
 public class TelegramBotImageCropService
 {
     static readonly string _ffmpeg = Environment.GetEnvironmentVariable("FFMPEG_FILE_PATH") ?? "ffmpeg";
-    const int _targetWidth = 150;
-    const int _targetHeight = 150;
+    const int _targetWidth = 100;
+    const int _targetHeight = 100;
 
     public static byte[] Crop(byte[] bytes, CropPosition position)
     {

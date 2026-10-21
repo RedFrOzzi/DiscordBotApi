@@ -55,7 +55,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
     }
 
     [HttpPost("image-upload")]
-    [Authorize(Roles = "Admin,Moderator,TGUser")]
+    [Authorize(Roles = "Admin,Moderator")]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
@@ -176,7 +176,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
     }
 
     [HttpDelete("{key:int}/image-delete")]
-    [Authorize(Roles = "Admin,Moderator,TGUser")]
+    [Authorize(Roles = "Admin,Moderator")]
     [ProducesResponseType(204)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -198,6 +198,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
     }
 
     [HttpGet("{key:int}/image-download")]
+    [Authorize(Roles = "Admin,Moderator")]
     [ProducesResponseType(200)]
     [ProducesResponseType(401)]
     [ProducesResponseType(404)]
@@ -231,7 +232,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
     }
 
     [HttpGet("image-get-all")]
-    [Authorize(Roles = "Admin,Moderator,TGUser")]
+    [Authorize(Roles = "Admin,Moderator")]
     [ProducesResponseType<IEnumerable<TelegramBotImageGetDto>>(200)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetImages()
@@ -254,7 +255,7 @@ public class TelegramBotController(TelegramBotService botService, ApplicationDbC
     }
 
     [HttpPatch("image-rename")]
-    [Authorize(Roles = "Admin,Moderator,TGUser")]
+    [Authorize(Roles = "Admin,Moderator")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]

@@ -154,6 +154,30 @@ public class UsersController(
         return Ok();
     }
 
+    [HttpGet("get-users")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType<List<ApiUserGetAllDto>>(200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> GetUsers()
+    {
+        var users = _context.ApiUsers
+            .Select(u => new ApiUserGetAllDto()
+            {
+                Id = u.Id.ToString(),
+                Login = u.Login,
+                IsAdmin = u.IsAdmin,
+                IsModerator = u.IsModerator,
+                IsTelegramUser = u.IsTelegramUser,
+                DiscordUserId = u.DiscordUser.Id
+            })
+            .ToList();
+
+        if (users.Count == 0)
+            return NotFound();
+
+        return Ok(users);
+    }
+
     [HttpPost("link-user")]
     [Authorize(Roles = "Admin")]
     [ProducesResponseType(200)]
@@ -267,6 +291,35 @@ public class UsersController(
 
         if (!_passwordHasher.IsVarified(apiUserAddModDto.Password, authorizedUser.PasswordHash))
             return Unauthorized("Wrong login or password");
+
+        if (newModeratorUser == null)
+            return NotFound("User not found");
+
+        newModeratorUser.IsModerator = true;
+        if (_context.SaveChanges() == 0)
+            return StatusCode(StatusCodes.Status500InternalServerError);
+
+        return Ok();
+    }
+
+    [HttpPost("promote-to-moderator")]
+    [Authorize(Roles = "Admin")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    [ProducesResponseType(500)]
+    public IActionResult PromoteToModerator([FromBody] ApiUserPromoteToModeratorDto dto)
+    {
+        if (dto == null || string.IsNullOrEmpty(dto.NewModeratorLogin))
+        {
+            return BadRequest(new ProblemDetails()
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Detail = "Parameters error"
+            });
+        }
+
+        var newModeratorUser = _context.ApiUsers.FirstOrDefault(u => u.Login == dto.NewModeratorLogin);
 
         if (newModeratorUser == null)
             return NotFound("User not found");

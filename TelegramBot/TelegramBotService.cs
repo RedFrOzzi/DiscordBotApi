@@ -14,6 +14,7 @@ public class TelegramBotService
     readonly ApplicationDbContext _dbContext;
     readonly TelegramBotSlashCommands _slashCommands;
     readonly static string _baseImagePath = Path.Combine(AppContext.BaseDirectory, "ImageStorage");
+    readonly ReactionTypeEmoji[] _clapEmoji = [new() { Emoji = "👏" }];
 
     public TelegramBotService(TelegramBotClient telegramBotClient, ApplicationDbContext dbContext, TelegramBotSlashCommands slashCommands)
     {
@@ -48,6 +49,24 @@ public class TelegramBotService
             return;
         }
 
+        //Good morning emoji
+        ReadOnlySpan<char> span = rawText.AsSpan().Trim();
+        if (!span.IsEmpty
+            && span[0] is 'д' or 'Д')
+        {
+            span = span.TrimEnd(['!', ' ']);
+            if (span.Equals("доброе утро".AsSpan(), StringComparison.OrdinalIgnoreCase))
+            {
+                await _botClient.SetMessageReaction(
+                    message.Chat.Id,
+                    message.Id,
+                    _clapEmoji,
+                    cancellationToken: cancellationToken);
+
+                return;
+            }
+        }
+
         //Text to image replace
         if (!TelegramBotHelpers.TryNormalizeWord(rawText, out var normalized))
             return;
@@ -58,11 +77,15 @@ public class TelegramBotService
         if (record is null)
             return;
 
-        var fullPath = Path.Combine(_baseImagePath, record.ImageFileName);
-        if (!File.Exists(fullPath))
+        string? fullPath = null;
+        if (string.IsNullOrEmpty(record.TelegramFileId))
         {
-            Log.Warning("Для команды '{0}' не найден файл {1}", record.Command, fullPath);
-            return;
+            fullPath = Path.Combine(_baseImagePath, record.ImageFileName);
+            if (!File.Exists(fullPath))
+            {
+                Log.Warning("Для команды '{0}' не найден файл {1}", record.Command, fullPath);
+                return;
+            }
         }
 
         ReplyParameters? replyParams = message.ReplyToMessage is { } repliedTo
